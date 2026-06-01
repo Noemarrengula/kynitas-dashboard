@@ -463,8 +463,8 @@ export default function Sales() {
     bill.push('');
     
     orderItems.forEach((item) => {
-      bill.push(item.product.name);
-      bill.push(formatLine(`  ${item.quantity}x ${formatCurrency(item.product.price)}`, formatCurrency(item.subtotal)));
+      bill.push(item.product?.name ?? 'Produto');
+      bill.push(formatLine(`  ${item.quantity}x ${formatCurrency(item.product?.price ?? 0)}`, formatCurrency(item.subtotal)));
     });
     
     bill.push('');
@@ -616,8 +616,8 @@ export default function Sales() {
     receipt.push('');
     
     sale.items.forEach((item: any) => {
-      receipt.push(item.product.name);
-      receipt.push(formatLine(`  ${item.quantity}x ${formatCurrency(item.product.price)}`, formatCurrency(item.subtotal)));
+      receipt.push(item.product?.name ?? 'Produto');
+      receipt.push(formatLine(`  ${item.quantity}x ${formatCurrency(item.product?.price ?? 0)}`, formatCurrency(item.subtotal)));
     });
     
     receipt.push('');

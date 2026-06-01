@@ -306,8 +306,8 @@ export default function Tables() {
     receipt.push('');
     
     sale.items.forEach((item: any) => {
-      receipt.push(item.product.name);
-      receipt.push(formatLine(`  ${item.quantity}x ${formatCurrency(item.product.price)}`, formatCurrency(item.subtotal)));
+      receipt.push(item.product?.name ?? 'Produto');
+      receipt.push(formatLine(`  ${item.quantity}x ${formatCurrency(item.product?.price ?? 0)}`, formatCurrency(item.subtotal)));
     });
     
     receipt.push('');
@@ -457,8 +457,8 @@ export default function Tables() {
     bill.push('');
     
     orderItems.forEach((item) => {
-      bill.push(item.product.name);
-      bill.push(formatLine(`  ${item.quantity}x ${formatCurrency(item.product.price)}`, formatCurrency(item.subtotal)));
+      bill.push(item.product?.name ?? 'Produto');
+      bill.push(formatLine(`  ${item.quantity}x ${formatCurrency(item.product?.price ?? 0)}`, formatCurrency(item.subtotal)));
     });
     
     bill.push('');
@@ -634,7 +634,7 @@ export default function Tables() {
                       <p className="text-xs font-semibold text-muted-foreground">Itens:</p>
                       {order.items.slice(0, 3).map((item, idx) => (
                         <p key={idx} className="text-xs truncate">
-                          {item.quantity}x {item.product.name}
+                          {item.quantity}x {item.product?.name ?? 'Produto'}
                         </p>
                       ))}
                       {order.items.length > 3 && (
@@ -714,8 +714,8 @@ export default function Tables() {
                           <X className="h-4 w-4" />
                         </button>
                         <div>
-                          <p className="font-medium text-sm">{item.product.name}</p>
-                          <p className="text-xs text-muted-foreground">{item.product.price} MT cada</p>
+                          <p className="font-medium text-sm">{item.product?.name ?? 'Produto'}</p>
+                          <p className="text-xs text-muted-foreground">{item.product?.price ?? 0} MT cada</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">

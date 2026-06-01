@@ -101,8 +101,8 @@ export default function SalesHistory() {
     receipt.push('');
     
     sale.items.forEach((item: any) => {
-      receipt.push(item.product.name);
-      receipt.push(formatLine(`  ${item.quantity}x ${formatCurrency(item.product.price)}`, formatCurrency(item.subtotal)));
+      receipt.push(item.product?.name ?? 'Produto');
+      receipt.push(formatLine(`  ${item.quantity}x ${formatCurrency(item.product?.price ?? 0)}`, formatCurrency(item.subtotal)));
     });
     
     receipt.push('');

@@ -67,10 +67,10 @@ export function generateReceipt(sale: Sale, config: Partial<PrinterConfig> = {})
   lines.push('');
   
   sale.items.forEach(item => {
-    const name = item.product.name.substring(0, cfg.width);
+    const name = (item.product?.name ?? 'Produto').substring(0, cfg.width);
     lines.push(name);
     
-    const qty = `  ${item.quantity}x ${item.product.price.toFixed(2)} MT`;
+    const qty = `  ${item.quantity}x ${(item.product?.price ?? 0).toFixed(2)} MT`;
     const subtotal = item.subtotal.toFixed(2) + ' MT';
     lines.push(formatLine(qty, subtotal, cfg.width));
     lines.push('');

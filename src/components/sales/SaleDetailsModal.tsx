@@ -125,13 +125,13 @@ export function SaleDetailsModal({ sale, open, onClose }: SaleDetailsModalProps)
                 {sale.items.map((item, index) => (
                   <div key={index} className="flex justify-between items-center p-3 bg-muted rounded-lg">
                     <div className="flex items-center gap-3">
-                      {item.product.image && (
-                        <img src={item.product.image} alt={item.product.name} className="h-10 w-10 rounded object-cover" />
+                      {item.product?.image && (
+                        <img src={item.product.image} alt={item.product?.name ?? 'Produto'} className="h-10 w-10 rounded object-cover" />
                       )}
                       <div>
-                        <p className="font-medium">{item.product.name}</p>
+                        <p className="font-medium">{item.product?.name ?? 'Produto'}</p>
                         <p className="text-sm text-muted-foreground">
-                          {formatCurrency(item.product.price)} × {item.quantity}
+                          {formatCurrency(item.product?.price ?? 0)} × {item.quantity}
                         </p>
                       </div>
                     </div>
