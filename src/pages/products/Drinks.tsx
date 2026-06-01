@@ -206,10 +206,10 @@ export default function Drinks() {
                     {product.price.toLocaleString('pt-MZ')} MT
                   </TableCell>
                   <TableCell className="text-right text-muted-foreground">
-                    {product.costPrice ? `${product.costPrice.toLocaleString('pt-MZ')} MT` : '—'}
+                    {product.costPrice != null ? `${product.costPrice.toLocaleString('pt-MZ')} MT` : '—'}
                   </TableCell>
                   <TableCell className="text-right">
-                    {product.costPrice ? (
+                    {product.costPrice != null ? (
                       <Badge className={cn(
                         (product.price - product.costPrice) / product.price >= 0.3
                           ? 'bg-success/10 text-success hover:bg-success/20'

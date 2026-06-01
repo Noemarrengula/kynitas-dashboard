@@ -219,7 +219,7 @@ export default function Meals() {
                     {(product.estimatedCost ?? 0).toLocaleString('pt-MZ')} MT
                   </TableCell>
                   <TableCell className="text-right text-muted-foreground">
-                    {product.costPrice ? `${product.costPrice.toLocaleString('pt-MZ')} MT` : '—'}
+                    {product.costPrice != null ? `${product.costPrice.toLocaleString('pt-MZ')} MT` : '—'}
                   </TableCell>
                   <TableCell className="text-right">
                     <Badge className={cn(

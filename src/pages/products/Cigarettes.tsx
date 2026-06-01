@@ -176,7 +176,7 @@ export default function Cigarettes() {
                     {cigarette.price.toLocaleString('pt-MZ')} MT
                   </TableCell>
                   <TableCell className="text-right">
-                    {cigarette.costPrice ? `${cigarette.costPrice.toLocaleString('pt-MZ')} MT` : '—'}
+                    {cigarette.costPrice != null ? `${cigarette.costPrice.toLocaleString('pt-MZ')} MT` : '—'}
                   </TableCell>
                   <TableCell className="text-right">
                     <Badge className={cn(

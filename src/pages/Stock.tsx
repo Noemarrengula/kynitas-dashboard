@@ -92,7 +92,7 @@ export default function Stock() {
     if (product) {
       setSelectedProductId(productId);
       setNewPrice((product.price || 0).toString());
-      setNewCostPrice(product.costPrice ? product.costPrice.toString() : '');
+      setNewCostPrice(product.costPrice != null ? product.costPrice.toString() : '');
       setPriceDialogOpen(true);
     }
   };
@@ -409,7 +409,7 @@ export default function Stock() {
                     {product.price.toLocaleString('pt-MZ')} MT
                   </TableCell>
                   <TableCell className="text-right text-muted-foreground">
-                    {product.costPrice ? `${product.costPrice.toLocaleString('pt-MZ')} MT` : '—'}
+                    {product.costPrice != null ? `${product.costPrice.toLocaleString('pt-MZ')} MT` : '—'}
                   </TableCell>
                   <TableCell className="text-right">
                     <Badge className={cn(
@@ -425,7 +425,7 @@ export default function Stock() {
                     {(product.stock * product.price).toLocaleString('pt-MZ')} MT
                   </TableCell>
                   <TableCell className="text-right font-medium text-muted-foreground">
-                    {product.costPrice ? `${(product.stock * product.costPrice).toLocaleString('pt-MZ')} MT` : '—'}
+                    {product.costPrice != null ? `${(product.stock * product.costPrice).toLocaleString('pt-MZ')} MT` : '—'}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
