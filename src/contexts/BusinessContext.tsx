@@ -119,6 +119,9 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
               created_at: new Date().toISOString(),
             });
           }
+        })
+        .catch((err) => {
+          console.error('Erro ao buscar role do usuário:', err);
         });
 
       localStorage.setItem('currentBusinessId', businessId);

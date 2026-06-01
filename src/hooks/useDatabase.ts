@@ -23,18 +23,36 @@ const DB_FIELD_MAP: Record<string, string> = {
   daily_stock: 'dailyStock',
   dailyStock: 'daily_stock',
   internal_id: 'internal_id',
-  business_id: 'business_id',
-  created_at: 'created_at',
-  updated_at: 'updated_at',
-  sale_number: 'sale_number',
-  payment_details: 'payment_details',
-  table_id: 'table_id',
-  customer_name: 'customer_name',
-  customer_phone: 'customer_phone',
-  amount_paid: 'amount_paid',
-  remaining_balance: 'remaining_balance',
-  last_payment_at: 'last_payment_at',
-  sale_id: 'sale_id',
+  business_id: 'businessId',
+  businessId: 'business_id',
+  created_at: 'createdAt',
+  createdAt: 'created_at',
+  updated_at: 'updatedAt',
+  updatedAt: 'updated_at',
+  sale_number: 'saleNumber',
+  saleNumber: 'sale_number',
+  payment_details: 'paymentDetails',
+  paymentDetails: 'payment_details',
+  table_id: 'tableId',
+  tableId: 'table_id',
+  table_number: 'tableNumber',
+  tableNumber: 'table_number',
+  table_name: 'tableName',
+  tableName: 'table_name',
+  table_customer_name: 'tableCustomerName',
+  tableCustomerName: 'table_customer_name',
+  customer_name: 'customerName',
+  customerName: 'customer_name',
+  customer_phone: 'customerPhone',
+  customerPhone: 'customer_phone',
+  amount_paid: 'amountPaid',
+  amountPaid: 'amount_paid',
+  remaining_balance: 'remainingBalance',
+  remainingBalance: 'remaining_balance',
+  last_payment_at: 'lastPaymentAt',
+  lastPaymentAt: 'last_payment_at',
+  sale_id: 'saleId',
+  saleId: 'sale_id',
 };
 
 function toSnakeCase(obj: Record<string, any>): Record<string, any> {
@@ -138,7 +156,7 @@ export function useDatabase() {
             .select('*')
             .eq('business_id', currentBusiness.id)
             .order('created_at', { ascending: false })
-            .limit(1000), // Aumentar limite para 1000 registros
+            .limit(2000), // Aumentar limite para 2000 registros
           new Promise((_, reject) => 
             setTimeout(() => reject(new Error('Timeout ao carregar vendas')), 10000)
           ) as any
@@ -177,6 +195,9 @@ export function useDatabase() {
             total: sale.total,
             paymentDetails: sale.payment_details || {},
             tableId: sale.table_id,
+            table_number: sale.table_number,
+            table_name: sale.table_name,
+            table_customer_name: sale.table_customer_name,
             createdAt: sale.created_at
           }));
           setSales(transformedSales);
@@ -397,14 +418,26 @@ export function useDatabase() {
         total: sale.total
       });
 
+      // Calcular próximo número de venda
+      const { count } = await supabase
+        .from('sales')
+        .select('*', { count: 'exact', head: true })
+        .eq('business_id', currentBusiness.id);
+
+      const nextSaleNumber = (count || 0) + 1;
+
       const { data, error } = await supabase
         .from('sales')
         .insert({
           business_id: currentBusiness.id,
+          sale_number: nextSaleNumber,
           items: sale.items,
           total: sale.total,
           payment_details: sale.paymentDetails || {},
-          table_id: sale.tableId || null
+          table_id: sale.tableId || null,
+          table_number: sale.table_number || null,
+          table_name: sale.table_name || null,
+          table_customer_name: sale.table_customer_name || null,
         })
         .select()
         .single();
@@ -424,6 +457,9 @@ export function useDatabase() {
         total: data.total,
         paymentDetails: data.payment_details || {},
         tableId: data.table_id,
+        table_number: data.table_number,
+        table_name: data.table_name,
+        table_customer_name: data.table_customer_name,
         createdAt: data.created_at
       };
       
@@ -677,10 +713,6 @@ export function useDatabase() {
     return salesMap;
   }, [sales]);
 
-  const safeIngredients = ingredients || [];
-  const safeSales = sales || [];
-
-  // Atualizar lógica para usar safeIngredients e safeSales
   const stockByMeal = useMemo(() => {
     const stockMap: Record<string, number> = {};
 
@@ -725,6 +757,9 @@ export function useDatabase() {
           total: sale.total,
           paymentDetails: sale.payment_details || {},
           tableId: sale.table_id,
+          table_number: sale.table_number,
+          table_name: sale.table_name,
+          table_customer_name: sale.table_customer_name,
           createdAt: sale.created_at
         }));
         setSales(transformedSales);
@@ -744,6 +779,8 @@ export function useDatabase() {
   // Aliases para compatibilidade
   const getSales = async () => sales;
   const createSale = addSale;
+  const getProducts = async () => products;
+  const createProduct = addProduct;
 
   return {
     loading,
@@ -764,6 +801,8 @@ export function useDatabase() {
     addSale,
     getSales,
     createSale,
+    getProducts,
+    createProduct,
     loadAllSales,
     addCredit,
     payCredit,

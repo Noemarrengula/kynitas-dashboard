@@ -174,8 +174,8 @@ export function exportInventoryToPDF(ingredients: any[]) {
     ing.name,
     `${ing.stock} ${ing.unit}`,
     `${ing.minStock} ${ing.unit}`,
-    `${ing.costPerUnit.toFixed(2)} MT`,
-    `${(ing.stock * ing.costPerUnit).toFixed(2)} MT`,
+    `${(ing.costPerUnit || 0).toFixed(2)} MT`,
+    `${(ing.stock * (ing.costPerUnit || 0)).toFixed(2)} MT`,
     ing.stock <= ing.minStock ? 'Crítico' : 'OK',
   ]);
   
@@ -192,7 +192,7 @@ export function exportInventoryToPDF(ingredients: any[]) {
     },
   });
   
-  const totalValue = ingredients.reduce((sum, i) => sum + (i.stock * i.costPerUnit), 0);
+  const totalValue = ingredients.reduce((sum, i) => sum + (i.stock * (i.costPerUnit || 0)), 0);
   const criticalCount = ingredients.filter(i => i.stock <= i.minStock).length;
   const finalY = (doc as any).lastAutoTable.finalY || 35;
   
@@ -215,12 +215,12 @@ export function exportInventoryToExcel(ingredients: any[]) {
     ing.stock,
     ing.unit,
     ing.minStock,
-    ing.costPerUnit.toFixed(2),
-    (ing.stock * ing.costPerUnit).toFixed(2),
+    (ing.costPerUnit || 0).toFixed(2),
+    (ing.stock * (ing.costPerUnit || 0)).toFixed(2),
     ing.stock <= ing.minStock ? 'Crítico' : 'OK',
   ]);
   
-  const totalValue = ingredients.reduce((sum, i) => sum + (i.stock * i.costPerUnit), 0);
+  const totalValue = ingredients.reduce((sum, i) => sum + (i.stock * (i.costPerUnit || 0)), 0);
   const criticalCount = ingredients.filter(i => i.stock <= i.minStock).length;
   
   rows.push([]);

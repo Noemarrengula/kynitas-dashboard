@@ -272,6 +272,7 @@ export default function Tables() {
       
       setTimeout(() => {
         printWindow.print();
+        setTimeout(() => printWindow.close(), 500);
       }, 500);
     } catch (error) {
       console.error('Erro ao imprimir:', error);

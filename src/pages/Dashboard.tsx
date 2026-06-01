@@ -81,7 +81,7 @@ export default function Dashboard() {
         </div>
         <div className="flex gap-2">
           <button
-            onClick={loadAllSales}
+            onClick={() => { loadAllSales().catch(console.error); }}
             className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
           >
             📊 Carregar Histórico Completo

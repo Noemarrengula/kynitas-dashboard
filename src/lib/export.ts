@@ -23,19 +23,24 @@ export function exportToCSV(data: any[], filename: string) {
 
 export function formatSalesForExport(sales: any[]) {
   return sales.map(sale => ({
-    'Data': new Date(sale.created_at).toLocaleString('pt-PT'),
+    'Data': new Date(sale.createdAt).toLocaleString('pt-PT'),
     'Total': `${sale.total.toFixed(2)} MT`,
     'Itens': sale.items.length,
-    'Pagamento': sale.payment_details?.method || 'N/A',
+    'Método': sale.paymentDetails?.cash > 0 ? 'Numerário'
+      : sale.paymentDetails?.mpesa > 0 ? 'M-Pesa'
+      : sale.paymentDetails?.emola > 0 ? 'E-Mola'
+      : sale.paymentDetails?.card > 0 ? 'Cartão'
+      : 'N/A',
   }));
 }
 
 export function formatProductsForExport(products: any[]) {
   return products.map(product => ({
     'Nome': product.name,
-    'Categoria': product.category === 'drink' ? 'Bebida' : 'Refeição',
+    'Categoria': product.category === 'drink' ? 'Bebida' : product.category === 'meal' ? 'Refeição' : 'Cigarro',
     'Preço': `${product.price.toFixed(2)} MT`,
-    'Criado em': new Date(product.created_at).toLocaleDateString('pt-PT'),
+    'Stock': product.stock,
+    'Custo': product.costPrice ? `${product.costPrice.toFixed(2)} MT` : '-',
   }));
 }
 
@@ -44,8 +49,8 @@ export function formatIngredientsForExport(ingredients: any[]) {
     'Nome': ingredient.name,
     'Unidade': ingredient.unit,
     'Stock': ingredient.stock,
-    'Stock Mínimo': ingredient.min_stock,
-    'Custo/Unidade': `${ingredient.cost_per_unit.toFixed(2)} MT`,
-    'Status': ingredient.stock <= ingredient.min_stock ? 'CRÍTICO' : 'OK',
+    'Stock Mínimo': ingredient.minStock,
+    'Custo/Unidade': `${(ingredient.costPerUnit || 0).toFixed(2)} MT`,
+    'Status': ingredient.stock <= ingredient.minStock ? 'CRÍTICO' : 'OK',
   }));
 }

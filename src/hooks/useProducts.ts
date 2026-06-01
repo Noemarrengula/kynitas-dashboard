@@ -1,56 +1,29 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useDatabase } from './useDatabase';
-import { Product } from '@/types';
 
 export function useProducts() {
-  const db = useDatabase();
-  
-  const query = useQuery({
-    queryKey: ['products'],
-    queryFn: db.getProducts
-  });
-
+  const { products, loading, error } = useDatabase();
   return {
-    products: query.data || [],
-    loading: query.isLoading,
-    error: query.error?.message || null,
-    refetch: query.refetch
+    products,
+    loading,
+    error: error?.message || null,
+    refetch: () => {}
   };
 }
 
 export function useCreateProduct() {
-  const queryClient = useQueryClient();
-  const db = useDatabase();
-  
-  return useMutation({
-    mutationFn: db.createProduct,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-    },
-  });
+  const { addProduct } = useDatabase();
+  return { mutateAsync: addProduct };
 }
 
 export function useUpdateProduct() {
-  const queryClient = useQueryClient();
-  const db = useDatabase();
-  
-  return useMutation({
-    mutationFn: ({ id, updates }: { id: string; updates: Partial<Product> }) => 
-      db.updateProduct(id, updates),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-    },
-  });
+  const { updateProduct } = useDatabase();
+  return {
+    mutateAsync: ({ id, updates }: { id: string; updates: any }) =>
+      updateProduct(id, updates)
+  };
 }
 
 export function useDeleteProduct() {
-  const queryClient = useQueryClient();
-  const db = useDatabase();
-  
-  return useMutation({
-    mutationFn: db.deleteProduct,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-    },
-  });
+  const { deleteProduct } = useDatabase();
+  return { mutateAsync: deleteProduct };
 }

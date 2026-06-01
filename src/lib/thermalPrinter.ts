@@ -92,27 +92,33 @@ export function generateReceipt(sale: Sale, config: Partial<PrinterConfig> = {})
   lines.push(line('-', cfg.width));
   lines.push('');
   
-  if (sale.paymentDetails.cash > 0) {
-    lines.push(formatLine('  Numerario:', sale.paymentDetails.cash.toFixed(2) + ' MT', cfg.width));
+  const pd = sale.paymentDetails || {};
+  const cash = pd.cash || 0;
+  const mpesa = pd.mpesa || 0;
+  const emola = pd.emola || 0;
+  const card = pd.card || 0;
+  const change = pd.change || 0;
+
+  if (cash > 0) {
+    lines.push(formatLine('  Numerario:', cash.toFixed(2) + ' MT', cfg.width));
   }
-  if (sale.paymentDetails.mpesa > 0) {
-    lines.push(formatLine('  M-Pesa:', sale.paymentDetails.mpesa.toFixed(2) + ' MT', cfg.width));
+  if (mpesa > 0) {
+    lines.push(formatLine('  M-Pesa:', mpesa.toFixed(2) + ' MT', cfg.width));
   }
-  if (sale.paymentDetails.emola > 0) {
-    lines.push(formatLine('  E-Mola:', sale.paymentDetails.emola.toFixed(2) + ' MT', cfg.width));
+  if (emola > 0) {
+    lines.push(formatLine('  E-Mola:', emola.toFixed(2) + ' MT', cfg.width));
   }
-  if (sale.paymentDetails.card > 0) {
-    lines.push(formatLine('  Cartao:', sale.paymentDetails.card.toFixed(2) + ' MT', cfg.width));
+  if (card > 0) {
+    lines.push(formatLine('  Cartao:', card.toFixed(2) + ' MT', cfg.width));
   }
   
-  const totalReceived = sale.paymentDetails.cash + sale.paymentDetails.mpesa + 
-                        sale.paymentDetails.emola + sale.paymentDetails.card;
+  const totalReceived = cash + mpesa + emola + card;
   
   lines.push('');
   lines.push(formatLine('Total Recebido:', totalReceived.toFixed(2) + ' MT', cfg.width));
   
-  if (sale.paymentDetails.change > 0) {
-    lines.push(formatLine('>>> Troco:', sale.paymentDetails.change.toFixed(2) + ' MT <<<', cfg.width));
+  if (change > 0) {
+    lines.push(formatLine('>>> Troco:', change.toFixed(2) + ' MT <<<', cfg.width));
   }
 
   lines.push('');

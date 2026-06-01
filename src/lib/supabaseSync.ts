@@ -65,6 +65,9 @@ export const saveSale = async (sale: Sale) => {
         total: sale.total,
         payment_details: sale.paymentDetails,
         table_id: sale.tableId,
+        table_number: sale.table_number || null,
+        table_name: sale.table_name || null,
+        table_customer_name: sale.table_customer_name || null,
         created_at: sale.createdAt.toISOString(),
       });
     
@@ -93,6 +96,9 @@ export const loadSales = async (): Promise<Sale[]> => {
       total: s.total,
       paymentDetails: s.payment_details,
       tableId: s.table_id,
+      table_number: s.table_number,
+      table_name: s.table_name,
+      table_customer_name: s.table_customer_name,
       createdAt: new Date(s.created_at),
     }));
   } catch (error) {

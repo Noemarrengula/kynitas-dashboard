@@ -243,7 +243,7 @@ export default function Reports() {
           </Select>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" onClick={loadAllSales} className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100">
+          <Button variant="outline" onClick={() => { loadAllSales().catch(console.error); }} className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100">
             📊 Carregar Histórico
           </Button>
           <Button variant="outline" onClick={handleThermalPrint}>

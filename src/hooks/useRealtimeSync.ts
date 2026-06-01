@@ -1,10 +1,16 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useStore } from '@/store/useStore';
 import { toast } from './use-toast';
 
 export function useRealtimeSync() {
   const { setIngredients, setSales, ingredients, sales } = useStore();
+  const ingredientsRef = useRef(ingredients);
+  const salesRef = useRef(sales);
+
+  // Manter refs sempre actualizados
+  ingredientsRef.current = ingredients;
+  salesRef.current = sales;
 
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
@@ -17,7 +23,7 @@ export function useRealtimeSync() {
         { event: '*', schema: 'public', table: 'ingredients' },
         (payload) => {
           console.log('Ingrediente atualizado:', payload);
-          
+
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
             const newIngredient = {
               id: payload.new.id,
@@ -29,11 +35,16 @@ export function useRealtimeSync() {
               packages: payload.new.packages,
             };
 
+            const current = ingredientsRef.current;
             setIngredients(
-              ingredients.some(i => i.id === newIngredient.id)
-                ? ingredients.map(i => i.id === newIngredient.id ? newIngredient : i)
-                : [...ingredients, newIngredient]
+              current.some(i => i.id === newIngredient.id)
+                ? current.map(i => i.id === newIngredient.id ? newIngredient : i)
+                : [...current, newIngredient]
             );
+          } else if (payload.eventType === 'DELETE') {
+            const deletedId = payload.old.id;
+            const current = ingredientsRef.current;
+            setIngredients(current.filter(i => i.id !== deletedId));
           }
         }
       )
@@ -44,25 +55,50 @@ export function useRealtimeSync() {
       .channel('sales-changes')
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'sales' },
+        { event: '*', schema: 'public', table: 'sales' },
         (payload) => {
-          console.log('Nova venda:', payload);
-          
-          const newSale = {
-            id: payload.new.id,
-            items: payload.new.items,
-            total: payload.new.total,
-            paymentDetails: payload.new.payment_details,
-            tableId: payload.new.table_id,
-            createdAt: new Date(payload.new.created_at),
-          };
+          console.log('Venda atualizada:', payload);
 
-          setSales([newSale, ...sales]);
-          
-          toast({
-            title: 'Nova venda registrada!',
-            description: `Total: ${newSale.total.toFixed(2)} MT`,
-          });
+          if (payload.eventType === 'INSERT') {
+            const newSale = {
+              id: payload.new.id,
+              items: payload.new.items,
+              total: payload.new.total,
+              paymentDetails: payload.new.payment_details,
+              tableId: payload.new.table_id,
+              table_number: payload.new.table_number,
+              table_name: payload.new.table_name,
+              table_customer_name: payload.new.table_customer_name,
+              createdAt: new Date(payload.new.created_at),
+            };
+
+            const current = salesRef.current;
+            setSales([newSale, ...current]);
+
+            toast({
+              title: 'Nova venda registrada!',
+              description: `Total: ${newSale.total.toFixed(2)} MT`,
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedSale = {
+              id: payload.new.id,
+              items: payload.new.items,
+              total: payload.new.total,
+              paymentDetails: payload.new.payment_details,
+              tableId: payload.new.table_id,
+              table_number: payload.new.table_number,
+              table_name: payload.new.table_name,
+              table_customer_name: payload.new.table_customer_name,
+              createdAt: new Date(payload.new.created_at),
+            };
+
+            const current = salesRef.current;
+            setSales(current.map(s => s.id === updatedSale.id ? updatedSale : s));
+          } else if (payload.eventType === 'DELETE') {
+            const deletedId = payload.old.id;
+            const current = salesRef.current;
+            setSales(current.filter(s => s.id !== deletedId));
+          }
         }
       )
       .subscribe();
@@ -71,5 +107,5 @@ export function useRealtimeSync() {
       supabase.removeChannel(ingredientsChannel);
       supabase.removeChannel(salesChannel);
     };
-  }, [ingredients, sales, setIngredients, setSales]);
+  }, [setIngredients, setSales]); // já não depende de ingredients/sales
 }

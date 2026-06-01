@@ -130,6 +130,9 @@ export function sanitizeSaleData(data: any) {
       change: sanitizeNumber(data.paymentDetails?.change),
     },
     tableId: data.tableId ? data.tableId : undefined, // Manter UUID sem modificação
+    table_number: data.table_number,
+    table_name: data.table_name,
+    table_customer_name: data.table_customer_name,
   };
 }
 
