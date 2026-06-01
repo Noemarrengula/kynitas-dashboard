@@ -10,6 +10,49 @@ interface DatabaseError {
   details?: string;
 }
 
+// Mapeamento snake_case (DB) ↔ camelCase (TypeScript)
+const DB_FIELD_MAP: Record<string, string> = {
+  cost_price: 'costPrice',
+  costPrice: 'cost_price',
+  preco_dose: 'precoDose',
+  precoDose: 'preco_dose',
+  doses_por_garrafa: 'dosesPorGarrafa',
+  dosesPorGarrafa: 'doses_por_garrafa',
+  estimated_cost: 'estimatedCost',
+  estimatedCost: 'estimated_cost',
+  daily_stock: 'dailyStock',
+  dailyStock: 'daily_stock',
+  internal_id: 'internal_id',
+  business_id: 'business_id',
+  created_at: 'created_at',
+  updated_at: 'updated_at',
+  sale_number: 'sale_number',
+  payment_details: 'payment_details',
+  table_id: 'table_id',
+  customer_name: 'customer_name',
+  customer_phone: 'customer_phone',
+  amount_paid: 'amount_paid',
+  remaining_balance: 'remaining_balance',
+  last_payment_at: 'last_payment_at',
+  sale_id: 'sale_id',
+};
+
+function toSnakeCase(obj: Record<string, any>): Record<string, any> {
+  const result: Record<string, any> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    result[DB_FIELD_MAP[key] || key] = value;
+  }
+  return result;
+}
+
+function toCamelCase(obj: Record<string, any>): Record<string, any> {
+  const result: Record<string, any> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    result[DB_FIELD_MAP[key] || key] = value;
+  }
+  return result;
+}
+
 export function useDatabase() {
   const { currentBusiness } = useBusiness();
   const { toast } = useToast();
@@ -122,7 +165,7 @@ export function useDatabase() {
         }
 
         // Atualizar estado com dados carregados
-        if (productsData) setProducts(productsData);
+        if (productsData) setProducts(productsData.map(p => toCamelCase(p) as Product));
         if (ingredientsData) setIngredients(ingredientsData);
         
         // Transformar dados do Supabase para o formato esperado
@@ -190,7 +233,7 @@ export function useDatabase() {
       const { data, error } = await supabase
         .from('products')
         .insert([{ 
-          ...product,
+          ...toSnakeCase(product as Record<string, any>),
           business_id: currentBusiness.id 
         }])
         .select()
@@ -199,7 +242,7 @@ export function useDatabase() {
       if (error) throw error;
 
       if (data) {
-        setProducts([...products, data]);
+        setProducts([...products, toCamelCase(data) as Product]);
         toast({
           title: 'Produto criado',
           description: `${product.name} foi adicionado com sucesso`,
@@ -219,7 +262,7 @@ export function useDatabase() {
 
       const { data, error } = await supabase
         .from('products')
-        .update(updates)
+        .update(toSnakeCase(updates as Record<string, any>))
         .eq('id', id)
         .eq('business_id', currentBusiness.id)
         .select()
@@ -228,7 +271,7 @@ export function useDatabase() {
       if (error) throw error;
 
       if (data) {
-        setProducts(products.map(p => p.id === id ? data : p));
+        setProducts(products.map(p => p.id === id ? toCamelCase(data) as Product : p));
         toast({
           title: 'Produto atualizado',
           description: 'Alterações salvas com sucesso',
