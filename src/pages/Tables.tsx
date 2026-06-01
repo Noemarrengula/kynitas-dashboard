@@ -123,7 +123,7 @@ export default function Tables() {
     } else {
       setOrderItems(orderItems.map(i =>
         i.productId === productId
-          ? { ...i, quantity: newQuantity, subtotal: newQuantity * i.product.price }
+          ? { ...i, quantity: newQuantity, subtotal: newQuantity * (i.product?.price ?? 0) }
           : i
       ));
     }
@@ -159,15 +159,14 @@ export default function Tables() {
     setSelectedTable(null);
   };
 
-  const handlePaymentConfirm = (payment: { cash: number; mpesa: number; emola: number; card: number }) => {
+  const handlePaymentConfirm = async (payment: { cash: number; mpesa: number; emola: number; card: number }) => {
     if (!selectedTable) return;
 
     try {
       const totalReceived = payment.cash + payment.mpesa + payment.emola + payment.card;
       const change = totalReceived - total;
 
-      const newSale = {
-        id: `sale-${Date.now()}`,
+      const saleData = {
         items: orderItems,
         total,
         paymentDetails: {
@@ -185,7 +184,8 @@ export default function Tables() {
         table_customer_name: selectedTable.customer_name,
       };
 
-      addSale(newSale);
+      const { error } = await addSale(saleData);
+      if (error) throw error;
 
       if (selectedTable.currentOrderId) {
         updateOrder(selectedTable.currentOrderId, { status: 'paid' });
@@ -230,7 +230,7 @@ export default function Tables() {
       });
 
       // Imprimir recibo diretamente
-      printReceiptDirect(newSale);
+      printReceiptDirect(saleData);
 
       if (lowStockItems.length > 0 || lowIngredients.length > 0) {
       setTimeout(() => {

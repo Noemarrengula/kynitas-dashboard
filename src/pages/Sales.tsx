@@ -147,12 +147,12 @@ export default function Sales() {
     if (bottleQty > 0) {
       const bottleProduct = { ...fractionProduct, name: `${fractionProduct.name} (Garrafa)` };
       const existingBottle = orderItems.find(
-        i => i.productId === fractionProduct.id && i.product.name.includes('(Garrafa)')
+        i => i.productId === fractionProduct.id && i.product?.name?.includes('(Garrafa)')
       );
       if (existingBottle) {
         const newQty = existingBottle.quantity + bottleQty;
         setOrderItems(prev => prev.map(i =>
-          i.productId === fractionProduct.id && i.product.name.includes('(Garrafa)')
+          i.productId === fractionProduct.id && i.product?.name?.includes('(Garrafa)')
             ? { ...i, quantity: newQty, subtotal: newQty * fractionProduct.price }
             : i
         ));
@@ -170,12 +170,12 @@ export default function Sales() {
     if (shotQty > 0 && fractionProduct.precoDose) {
       const shotProduct = { ...fractionProduct, name: `${fractionProduct.name} (Dose)`, price: fractionProduct.precoDose };
       const existingShot = orderItems.find(
-        i => i.productId === fractionProduct.id && i.product.name.includes('(Dose)')
+        i => i.productId === fractionProduct.id && i.product?.name?.includes('(Dose)')
       );
       if (existingShot) {
         const newQty = existingShot.quantity + shotQty;
         setOrderItems(prev => prev.map(i =>
-          i.productId === fractionProduct.id && i.product.name.includes('(Dose)')
+          i.productId === fractionProduct.id && i.product?.name?.includes('(Dose)')
             ? { ...i, quantity: newQty, subtotal: newQty * (fractionProduct.precoDose || 0) }
             : i
         ));
@@ -210,10 +210,10 @@ export default function Sales() {
       return;
     }
     
-    if (newQuantity > item.product.stock) {
+    if (newQuantity > (item.product?.stock ?? 0)) {
       toast({
         title: 'Stock insuficiente',
-        description: `Apenas ${item.product.stock} unidades disponíveis`,
+        description: `Apenas ${item.product?.stock ?? 0} unidades disponíveis`,
         variant: 'destructive',
       });
       return;
@@ -221,7 +221,7 @@ export default function Sales() {
     
     setOrderItems(orderItems.map(i =>
       i.productId === productId
-        ? { ...i, quantity: newQuantity, subtotal: newQuantity * i.product.price }
+        ? { ...i, quantity: newQuantity, subtotal: newQuantity * (i.product?.price ?? 0) }
         : i
     ));
   };
@@ -271,8 +271,8 @@ export default function Sales() {
         ...savedSale,
         items: orderItems,
         total: total,
-        paymentDetails: savedSale.payment_details || saleData.paymentDetails,
-        createdAt: savedSale.created_at || saleData.createdAt
+        paymentDetails: savedSale.paymentDetails || saleData.paymentDetails,
+        createdAt: savedSale.createdAt || saleData.createdAt
       } : { ...saleData, id: `sale-${Date.now()}` };
 
       console.log('Preparando impressão...', saleForPrint);
@@ -823,8 +823,8 @@ export default function Sales() {
                       <X className="h-4 w-4" />
                     </button>
                     <div className="min-w-0">
-                      <p className="font-medium text-sm truncate">{item.product.name}</p>
-                      <p className="text-xs text-muted-foreground">{item.product.price} MT</p>
+                      <p className="font-medium text-sm truncate">{item.product?.name ?? 'Produto'}</p>
+                      <p className="text-xs text-muted-foreground">{item.product?.price ?? 0} MT</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-1">

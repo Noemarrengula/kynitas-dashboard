@@ -76,10 +76,10 @@ export function useDatabase() {
     console.error(`[${operation}]`, errorObj);
     setError(errorObj);
     
-    // Mostrar toast apenas para erros críticos
-    if (operation === 'LOAD_DATA' || operation === 'ADD_SALE') {
+    // Mostrar toast para erros de carregamento
+    if (operation === 'LOAD_DATA') {
       toast({
-        title: `Erro ao ${operation.toLowerCase()}`,
+        title: 'Erro ao carregar dados',
         description: errorObj.message,
         variant: 'destructive',
       });
@@ -429,7 +429,7 @@ export function useDatabase() {
       
       setSales([transformedSale, ...sales]);
       
-      // Atualizar stock localmente (trigger do DB faz no servidor)
+      // Atualizar stock localmente
       const updatedProducts = products.map(product => {
         const saleItems = sale.items.filter(item => item.productId === product.id);
         if (saleItems.length === 0) return product;
@@ -447,11 +447,6 @@ export function useDatabase() {
         return { ...product, stock: Math.max(0, product.stock - totalDeduction) };
       });
       setProducts(updatedProducts);
-      
-      toast({
-        title: 'Venda registrada',
-        description: `Venda #${transformedSale.saleNumber} foi salva com sucesso`,
-      });
 
       return { data: transformedSale, error: null };
     } catch (err: any) {
