@@ -17,17 +17,19 @@ export const calculateTopProducts = (sales: Sale[]): TopProduct[] => {
 
   sales.forEach(sale => {
     sale.items.forEach(item => {
-      const existing = productStats.get(item.name) || {
-        name: item.name,
+      const productName = item.product?.name ?? 'Produto';
+      const productPrice = item.product?.price ?? 0;
+      const existing = productStats.get(productName) || {
+        name: productName,
         quantity: 0,
         revenue: 0,
         times: 0,
       };
 
-      productStats.set(item.name, {
-        name: item.name,
+      productStats.set(productName, {
+        name: productName,
         quantity: existing.quantity + item.quantity,
-        revenue: existing.revenue + (item.price * item.quantity),
+        revenue: existing.revenue + (productPrice * item.quantity),
         times: existing.times + 1,
       });
     });
@@ -229,7 +231,7 @@ export const exportStockEvolutionToPDF = (products: Product[], sales: Sale[], st
   const soldMap = new Map<string, number>();
   salesInPeriod.forEach(sale => {
     sale.items.forEach(item => {
-      const qty = item.product.name.includes('(Dose)') && item.product.dosesPorGarrafa
+      const qty = item.product?.name?.includes('(Dose)') && item.product?.dosesPorGarrafa
         ? item.quantity / item.product.dosesPorGarrafa
         : item.quantity;
       soldMap.set(item.productId, (soldMap.get(item.productId) || 0) + qty);

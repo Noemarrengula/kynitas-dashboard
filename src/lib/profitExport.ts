@@ -21,7 +21,7 @@ export const calculateProfitData = (sales: Sale[]): ProfitData[] => {
     const existing = profitByDate.get(date) || { revenue: 0, cost: 0 };
     
     const saleCost = sale.items.reduce((acc, item) => {
-      return acc + (item.costPrice * item.quantity);
+      return acc + ((item.product?.costPrice ?? 0) * item.quantity);
     }, 0);
 
     profitByDate.set(date, {

@@ -75,6 +75,14 @@ export default function Reports() {
   const totalOrders = filteredSales.length;
   const averageTicket = totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
+  const totalCost = filteredSales.reduce((acc, s) => {
+    return acc + s.items.reduce((itemAcc, item) => {
+      return itemAcc + ((item.product?.costPrice ?? 0) * item.quantity);
+    }, 0);
+  }, 0);
+  const totalProfit = totalRevenue - totalCost;
+  const profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
+
   // Credits metrics
   const totalCreditsAmount = filteredCredits.reduce((acc, c) => acc + c.total, 0);
   const totalCreditsPaid = filteredCredits.reduce((acc, c) => acc + c.amountPaid, 0);
@@ -308,7 +316,7 @@ export default function Reports() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <div className="bg-card border rounded-xl p-5 animate-slide-up">
           <div className="flex items-center justify-between">
             <div>
@@ -329,6 +337,19 @@ export default function Reports() {
             </div>
             <div className="p-3 bg-success/10 rounded-xl">
               <ShoppingCart className="h-6 w-6 text-success" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-card border rounded-xl p-5 animate-slide-up" style={{ animationDelay: '0.15s' }}>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground">Lucro Líquido</p>
+              <p className="text-2xl font-bold mt-1">{formatCurrency(totalProfit)}</p>
+              <p className="text-xs text-muted-foreground mt-1">{profitMargin.toFixed(1)}% margem</p>
+            </div>
+            <div className="p-3 bg-emerald-500/10 rounded-xl">
+              <TrendingUp className="h-6 w-6 text-emerald-600" />
             </div>
           </div>
         </div>
