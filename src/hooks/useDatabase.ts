@@ -436,7 +436,7 @@ export function useDatabase() {
 
         let totalDeduction = 0;
         saleItems.forEach(item => {
-          const isDose = item.product.name.includes('(Dose)');
+          const isDose = item.product?.name?.includes('(Dose)') || false;
           if (isDose && product.dosesPorGarrafa && product.dosesPorGarrafa > 0) {
             totalDeduction += item.quantity / product.dosesPorGarrafa;
           } else {

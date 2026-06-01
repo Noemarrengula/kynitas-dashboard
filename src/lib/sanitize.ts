@@ -116,6 +116,7 @@ export function sanitizeSaleData(data: any) {
   return {
     items: Array.isArray(data.items) ? data.items.map((item: any) => ({
       productId: item.productId, // Manter UUID sem modificação
+      product: item.product,     // Manter dados do produto para receipt/stock
       quantity: sanitizeNumber(item.quantity),
       subtotal: sanitizeNumber(item.subtotal),
     })) : [],
