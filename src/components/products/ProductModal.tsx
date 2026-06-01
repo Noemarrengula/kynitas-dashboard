@@ -106,7 +106,7 @@ export function ProductModal({ open, onClose, product, type }: ProductModalProps
     setLoading(true);
 
     const productData: Omit<Product, 'id'> & { id: string } = {
-      id: generateUUID(),
+      id: product?.id || generateUUID(),
       name: formData.name,
       category: formData.category,
       price: Number(formData.price),

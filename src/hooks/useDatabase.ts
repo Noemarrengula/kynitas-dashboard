@@ -260,9 +260,10 @@ export function useDatabase() {
         throw new Error('Negócio não encontrado');
       }
 
+      const { id: _unused, ...cleanUpdates } = updates;
       const { data, error } = await supabase
         .from('products')
-        .update(toSnakeCase(updates as Record<string, any>))
+        .update(toSnakeCase(cleanUpdates as Record<string, any>))
         .eq('id', id)
         .eq('business_id', currentBusiness.id)
         .select()
