@@ -183,6 +183,69 @@ export function useCredits() {
     }
   };
 
+  const findOrCreateCustomer = async (name: string): Promise<Customer | null> => {
+    if (!currentBusiness?.id) return null;
+
+    const existing = customers.find(c => c.name.toLowerCase() === name.toLowerCase());
+    if (existing) return existing;
+
+    const { data, error } = await supabase
+      .from('customers')
+      .insert({
+        business_id: currentBusiness.id,
+        name,
+        credit_limit: 0,
+        current_balance: 0,
+        status: 'active',
+      })
+      .select()
+      .single();
+
+    if (!error && data) {
+      setCustomers([...customers, data]);
+      return data;
+    }
+    return null;
+  };
+
+  const registerCreditCharge = async (
+    customerName: string,
+    items: any[],
+    total: number,
+    description?: string
+  ) => {
+    try {
+      if (!currentBusiness?.id) throw new Error('Negócio não encontrado');
+
+      const customer = await findOrCreateCustomer(customerName);
+      if (!customer) throw new Error('Erro ao criar/encontrar cliente');
+
+      const { data, error } = await supabase.rpc('create_credit_sale', {
+        p_business_id: currentBusiness.id,
+        p_customer_id: customer.id,
+        p_items: items,
+        p_total: total,
+        p_description: description || 'Venda a crédito',
+      });
+
+      if (error) throw error;
+
+      if (data?.success) {
+        await loadData();
+        return { success: true, saleId: data.sale_id, transactionId: data.transaction_id, data };
+      } else {
+        throw new Error(data?.error || 'Erro ao registrar venda a crédito');
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao registrar venda a crédito',
+        description: error.message,
+        variant: 'destructive',
+      });
+      return { success: false, error: error.message };
+    }
+  };
+
   return {
     customers,
     transactions,
@@ -190,6 +253,7 @@ export function useCredits() {
     addCustomer,
     updateCustomer,
     registerPayment,
+    registerCreditCharge,
     getCustomerTransactions,
     refreshData: loadData,
   };

@@ -4,26 +4,32 @@ import { useStore } from '@/store/useStore';
 import { toast } from './use-toast';
 
 export function useRealtimeSync() {
-  const { setIngredients, setSales, ingredients, sales } = useStore();
+  const {
+    setIngredients, setSales, setProducts, setTables,
+    ingredients, sales, products, tables
+  } = useStore();
   const ingredientsRef = useRef(ingredients);
   const salesRef = useRef(sales);
+  const productsRef = useRef(products);
+  const tablesRef = useRef(tables);
 
-  // Manter refs sempre actualizados
   ingredientsRef.current = ingredients;
   salesRef.current = sales;
+  productsRef.current = products;
+  tablesRef.current = tables;
 
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
 
-    // Sincronizar ingredientes em tempo real
+    const channels = [];
+
+    // Ingredientes
     const ingredientsChannel = supabase
       .channel('ingredients-changes')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'ingredients' },
         (payload) => {
-          console.log('Ingrediente atualizado:', payload);
-
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
             const newIngredient = {
               id: payload.new.id,
@@ -34,7 +40,6 @@ export function useRealtimeSync() {
               costPerUnit: payload.new.cost_per_unit,
               packages: payload.new.packages,
             };
-
             const current = ingredientsRef.current;
             setIngredients(
               current.some(i => i.id === newIngredient.id)
@@ -42,23 +47,20 @@ export function useRealtimeSync() {
                 : [...current, newIngredient]
             );
           } else if (payload.eventType === 'DELETE') {
-            const deletedId = payload.old.id;
-            const current = ingredientsRef.current;
-            setIngredients(current.filter(i => i.id !== deletedId));
+            setIngredients(ingredientsRef.current.filter(i => i.id !== payload.old.id));
           }
         }
       )
       .subscribe();
+    channels.push(ingredientsChannel);
 
-    // Sincronizar vendas em tempo real
+    // Vendas
     const salesChannel = supabase
       .channel('sales-changes')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'sales' },
         (payload) => {
-          console.log('Venda atualizada:', payload);
-
           if (payload.eventType === 'INSERT') {
             const newSale = {
               id: payload.new.id,
@@ -71,13 +73,10 @@ export function useRealtimeSync() {
               table_customer_name: payload.new.table_customer_name,
               createdAt: new Date(payload.new.created_at),
             };
-
-            const current = salesRef.current;
-            setSales([newSale, ...current]);
-
+            setSales([newSale, ...salesRef.current]);
             toast({
               title: 'Nova venda registrada!',
-              description: `Total: ${newSale.total.toFixed(2)} MT`,
+              description: `Total: ${newSale.total?.toFixed(2) || '0.00'} MT`,
             });
           } else if (payload.eventType === 'UPDATE') {
             const updatedSale = {
@@ -91,21 +90,51 @@ export function useRealtimeSync() {
               table_customer_name: payload.new.table_customer_name,
               createdAt: new Date(payload.new.created_at),
             };
-
-            const current = salesRef.current;
-            setSales(current.map(s => s.id === updatedSale.id ? updatedSale : s));
+            setSales(salesRef.current.map(s => s.id === updatedSale.id ? updatedSale : s));
           } else if (payload.eventType === 'DELETE') {
-            const deletedId = payload.old.id;
-            const current = salesRef.current;
-            setSales(current.filter(s => s.id !== deletedId));
+            setSales(salesRef.current.filter(s => s.id !== payload.old.id));
           }
         }
       )
       .subscribe();
+    channels.push(salesChannel);
+
+    // Produtos
+    const productsChannel = supabase
+      .channel('products-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'products' },
+        (payload) => {
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const newProduct = {
+              id: payload.new.id,
+              name: payload.new.name,
+              category: payload.new.category,
+              price: payload.new.price,
+              costPrice: payload.new.cost_price,
+              stock: payload.new.stock,
+              internalId: payload.new.internal_id,
+              type: payload.new.type,
+              recipe: payload.new.recipe,
+              image: payload.new.image,
+            };
+            const current = productsRef.current;
+            setProducts(
+              current.some(p => p.id === newProduct.id)
+                ? current.map(p => p.id === newProduct.id ? newProduct : p)
+                : [...current, newProduct]
+            );
+          } else if (payload.eventType === 'DELETE') {
+            setProducts(productsRef.current.filter(p => p.id !== payload.old.id));
+          }
+        }
+      )
+      .subscribe();
+    channels.push(productsChannel);
 
     return () => {
-      supabase.removeChannel(ingredientsChannel);
-      supabase.removeChannel(salesChannel);
+      channels.forEach(ch => supabase.removeChannel(ch));
     };
-  }, [setIngredients, setSales]); // já não depende de ingredients/sales
+  }, [setIngredients, setSales, setProducts]);
 }

@@ -23,10 +23,13 @@ import {
 import { useStore } from '@/store/useStore';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Table, Order, OrderItem, Product } from '@/types';
+import { supabase } from '@/lib/supabase';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { TableManagementModal } from '@/components/tables/TableManagementModal';
 import { NewTableModal } from '@/components/tables/NewTableModal';
+import { useTablesPersistence } from '@/hooks/useTablesPersistence';
+import { useCredits } from '@/hooks/useCredits';
 
 const statusLabels = {
   free: 'Livre',
@@ -41,9 +44,11 @@ const statusColors = {
 };
 
 export default function Tables() {
-  const { tables, orders, updateTable, addOrder, updateOrder, addTable, setTables } = useStore();
-  const { products, ingredients, addSale, addCredit } = useDatabase();
+  const { tables, orders, setTables } = useStore();
+  const { products, ingredients, addSale } = useDatabase();
   const { business } = useBusiness();
+  const { addTable, updateTable, addOrder, updateOrder } = useTablesPersistence();
+  const { registerCreditCharge } = useCredits();
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -75,11 +80,12 @@ export default function Tables() {
 
   const handleSaveTableManagement = (data: { customer_name?: string; status: 'free' | 'occupied' | 'awaiting_payment' }) => {
     if (!managingTable) return;
-    updateTable(managingTable.id, {
+    const updated = {
       ...data,
       opened_at: data.status !== 'free' && !managingTable.opened_at ? new Date() : managingTable.opened_at,
       closed_at: data.status === 'free' ? new Date() : undefined,
-    });
+    };
+    updateTable(managingTable.id, updated);
     toast({ title: 'Mesa atualizada!' });
   };
 
@@ -184,17 +190,26 @@ export default function Tables() {
         table_customer_name: selectedTable.customer_name,
       };
 
-      const { error } = await addSale(saleData);
-      if (error) throw error;
+      const saleResult = await addSale(saleData);
+      if (saleResult.error) throw saleResult.error;
 
       if (selectedTable.currentOrderId) {
         updateOrder(selectedTable.currentOrderId, { status: 'paid' });
       }
 
-      // Arquivar mesa no histórico antes de remover
-      // TODO: Salvar no Supabase tables_history quando integrado
-      
-      // Remover mesa da visualização após pagamento
+      await supabase.from('tables_history').insert({
+        business_id: business?.id,
+        table_id: selectedTable.id,
+        table_number: selectedTable.number,
+        table_name: selectedTable.name,
+        customer_name: selectedTable.customer_name,
+        status: 'closed',
+        opened_at: selectedTable.opened_at?.toISOString(),
+        closed_at: new Date().toISOString(),
+        total_amount: total,
+        sale_id: saleResult.data?.id,
+      }).maybeSingle();
+
       const updatedTables = tables.filter(t => t.id !== selectedTable.id);
       setTables(updatedTables);
       setShowPaymentModal(false);
@@ -534,24 +549,18 @@ export default function Tables() {
     }
 
     try {
-      // Registar crédito
-      const creditData = {
-        customerName: creditCustomerName.trim(),
-        items: orderItems,
-        total: total,
-        status: 'pending' as const,
-      };
+      const result = await registerCreditCharge(
+        creditCustomerName.trim(),
+        orderItems,
+        total
+      );
 
-      const { error } = await addCredit(creditData);
-
-      if (error) {
-        throw error;
+      if (!result.success) {
+        throw new Error(result.error || 'Erro ao registrar crédito');
       }
 
-      // Marcar mesa como awaiting_payment
       updateTable(selectedTable.id, { status: 'awaiting_payment' });
 
-      // Limpar
       setShowCreditDialog(false);
       setCreditCustomerName('');
       setSelectedTable(null);

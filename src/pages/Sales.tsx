@@ -14,11 +14,13 @@ import { cn } from '@/lib/utils';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { sanitizeSaleData, sanitizeSearchQuery } from '@/lib/sanitize';
 import { useCashDrawer } from '@/hooks/useCashDrawer';
+import { useCredits } from '@/hooks/useCredits';
 
 export default function Sales() {
-  const { products, ingredients, addSale, addCredit, loading } = useDatabase();
+  const { products, ingredients, addSale, loading } = useDatabase();
   const { business } = useBusiness();
   const { open: openCashDrawer } = useCashDrawer();
+  const { registerCreditCharge } = useCredits();
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showCustomPriceDialog, setShowCustomPriceDialog] = useState(false);
@@ -345,25 +347,19 @@ export default function Sales() {
         return;
       }
 
-      // Registar crédito
-      const creditData = {
-        customerName: customerName.trim(),
-        items: orderItems,
-        total: total,
-        status: 'pending' as const,
-      };
+      const result = await registerCreditCharge(
+        customerName.trim(),
+        orderItems,
+        total
+      );
 
-      const { error } = await addCredit(creditData);
-
-      if (error) {
-        throw error;
+      if (!result.success) {
+        throw new Error(result.error || 'Erro ao registrar crédito');
       }
 
-      // Limpar carrinho e fechar modal
       setShowPaymentModal(false);
       setOrderItems([]);
 
-      // Imprimir conta se houver
       const creditForPrint = {
         id: `credit-${Date.now()}`,
         customerName,
@@ -381,18 +377,14 @@ export default function Sales() {
         title: 'Crédito registrado com sucesso!',
         description: `${customerName} levará ${orderItems.length} produto(s)`,
       });
-
     } catch (error: any) {
       console.error('Erro ao registar crédito:', error);
       toast({
         title: 'Erro ao registar crédito',
         description: error?.message || 'Tente novamente',
-        variant: 'destructive',
       });
     }
   };
-
-
 
   const printPreBill = () => {
     if (orderItems.length === 0) {

@@ -132,6 +132,39 @@ export function useSuppliers() {
     });
 
     if (!error) {
+      // Actualizar stock de produtos e ingredientes no recebimento
+      for (const item of items) {
+        if (item.product_id) {
+          const { data: currentProd } = await supabase
+            .from('products')
+            .select('stock')
+            .eq('id', item.product_id)
+            .single();
+
+          if (currentProd) {
+            await supabase
+              .from('products')
+              .update({ stock: (currentProd.stock || 0) + (item.quantity || 0) })
+              .eq('id', item.product_id);
+          }
+        }
+
+        if (item.ingredient_id) {
+          const { data: currentIng } = await supabase
+            .from('ingredients')
+            .select('stock')
+            .eq('id', item.ingredient_id)
+            .single();
+
+          if (currentIng) {
+            await supabase
+              .from('ingredients')
+              .update({ stock: (currentIng.stock || 0) + (item.quantity || 0) })
+              .eq('id', item.ingredient_id);
+          }
+        }
+      }
+
       await fetchPurchaseOrders();
       return data;
     }
