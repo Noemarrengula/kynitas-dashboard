@@ -274,7 +274,7 @@ export default function Reports() {
             <FileSpreadsheet className="h-4 w-4 mr-2" />
             Top Excel
           </Button>
-          <Button variant="outline" onClick={() => { exportStockEvolutionToPDF(products, sales, range.start, range.end, business?.name || 'Relatório', `evolucao-stock-${format(new Date(), 'yyyy-MM-dd')}.pdf`); toast({ title: 'Evolução de Stock PDF exportada!' }); }}>
+          <Button variant="outline" onClick={() => { try { exportStockEvolutionToPDF(products, sales, range.start, range.end, business?.name || 'Relatório', `evolucao-stock-${format(new Date(), 'yyyy-MM-dd')}.pdf`); toast({ title: 'Evolução de Stock PDF exportada!' }); } catch (e: any) { toast({ title: 'Erro ao exportar', description: e?.message || 'Erro desconhecido', variant: 'destructive' }); } }}>
             <FileSpreadsheet className="h-4 w-4 mr-2" />
             Evolução Stock PDF
           </Button>

@@ -94,8 +94,8 @@ export function exportDREToPDF(dreData: any, filename: string) {
   
   // Indicators
   const finalY = (doc as any).lastAutoTable.finalY || 45;
-  const marginPercentage = (dreData.gross_profit / dreData.total_revenue) * 100;
-  const profitPercentage = (dreData.net_profit / dreData.total_revenue) * 100;
+  const marginPercentage = dreData.total_revenue > 0 ? (dreData.gross_profit / dreData.total_revenue) * 100 : 0;
+  const profitPercentage = dreData.total_revenue > 0 ? (dreData.net_profit / dreData.total_revenue) * 100 : 0;
   
   doc.setFontSize(10);
   doc.text('INDICADORES:', 14, finalY + 15);

@@ -7,19 +7,33 @@ import { exportToExcel } from '@/lib/export';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { useDatabase } from '@/hooks/useDatabase';
+import { useAccountsPayable } from '@/hooks/useAccountsPayable';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { toast } from '@/hooks/use-toast';
 
 export function DRETab() {
   const { sales } = useDatabase();
+  const { accounts } = useAccountsPayable();
 
   const totalRevenue = sales.reduce((sum, s) => sum + s.total, 0);
-  const totalCosts = 0; // Calcular custos reais
-  const totalExpenses = 0; // Buscar do accounts_payable
+
+  // Custo dos produtos vendidos (soma de costPrice * quantidade de cada item)
+  const totalCosts = sales.reduce((sum, s) => {
+    return sum + s.items.reduce((itemSum, item) => {
+      return itemSum + ((item.product?.costPrice ?? 0) * item.quantity);
+    }, 0);
+  }, 0);
+
+  // Despesas reais (contas pagas)
+  const totalExpenses = accounts
+    .filter(a => a.status === 'paid')
+    .reduce((sum, a) => sum + a.amount, 0);
+
   const grossProfit = totalRevenue - totalCosts;
   const netProfit = grossProfit - totalExpenses;
 
@@ -33,18 +47,28 @@ export function DRETab() {
   };
 
   const handleExportPDF = () => {
-    exportDREToPDF(dreData, `dre-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+    try {
+      exportDREToPDF(dreData, `dre-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+      toast({ title: 'DRE PDF exportado!' });
+    } catch (e: any) {
+      toast({ title: 'Erro ao exportar DRE', description: e?.message || 'Erro desconhecido', variant: 'destructive' });
+    }
   };
 
   const handleExportExcel = () => {
-    const data = [
-      { 'Descrição': 'RECEITAS', 'Valor': totalRevenue },
-      { 'Descrição': '(-) CUSTOS', 'Valor': totalCosts },
-      { 'Descrição': '(=) LUCRO BRUTO', 'Valor': grossProfit },
-      { 'Descrição': '(-) DESPESAS', 'Valor': totalExpenses },
-      { 'Descrição': '(=) LUCRO LÍQUIDO', 'Valor': netProfit },
-    ];
-    exportToExcel(data, `dre-${format(new Date(), 'yyyy-MM-dd')}`);
+    try {
+      const data = [
+        { 'Descrição': 'RECEITAS', 'Valor': totalRevenue },
+        { 'Descrição': '(-) CUSTOS', 'Valor': totalCosts },
+        { 'Descrição': '(=) LUCRO BRUTO', 'Valor': grossProfit },
+        { 'Descrição': '(-) DESPESAS', 'Valor': totalExpenses },
+        { 'Descrição': '(=) LUCRO LÍQUIDO', 'Valor': netProfit },
+      ];
+      exportToExcel(data, `dre-${format(new Date(), 'yyyy-MM-dd')}`);
+      toast({ title: 'DRE Excel exportado!' });
+    } catch (e: any) {
+      toast({ title: 'Erro ao exportar DRE', description: e?.message || 'Erro desconhecido', variant: 'destructive' });
+    }
   };
 
   return (
