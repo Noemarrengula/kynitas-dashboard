@@ -67,14 +67,30 @@ CREATE INDEX IF NOT EXISTS idx_credit_payments_created_at ON credit_payments(cre
 -- 5. Função para atualizar status de crédito quando pago
 CREATE OR REPLACE FUNCTION update_credit_status()
 RETURNS TRIGGER AS $$
+DECLARE
+  v_total_paid NUMERIC;
+  v_total_amount NUMERIC;
 BEGIN
-  -- Atualizar updated_at
+  -- Calcular total pago a partir dos registos de pagamento
+  SELECT COALESCE(SUM(amount), 0) INTO v_total_paid
+  FROM credit_payments
+  WHERE credit_id = NEW.credit_id;
+  
+  -- Obter o total do crédito
+  SELECT total INTO v_total_amount
+  FROM credits
+  WHERE id = NEW.credit_id;
+  
+  -- Atualizar o crédito com valores calculados
   UPDATE credits
   SET 
+    amount_paid = v_total_paid,
+    remaining_balance = v_total_amount - v_total_paid,
     updated_at = CURRENT_TIMESTAMP,
+    last_payment_at = CURRENT_TIMESTAMP,
     status = CASE
-      WHEN remaining_balance <= 0 THEN 'paid'
-      WHEN amount_paid > 0 THEN 'partial'
+      WHEN v_total_amount - v_total_paid <= 0 THEN 'paid'
+      WHEN v_total_paid > 0 THEN 'partial'
       ELSE 'pending'
     END
   WHERE id = NEW.credit_id;

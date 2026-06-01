@@ -520,17 +520,43 @@ export function useDatabase() {
         throw new Error('Negócio não encontrado. Faça login novamente.');
       }
 
+      // Buscar estado atual do crédito
+      const { data: currentCredit, error: fetchError } = await supabase
+        .from('credits')
+        .select('amount_paid, remaining_balance, total')
+        .eq('id', creditId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      const newAmountPaid = (currentCredit.amount_paid || 0) + amount;
+      const newRemainingBalance = Math.max(0, (currentCredit.remaining_balance || 0) - amount);
+      const newStatus = newRemainingBalance <= 0 ? 'paid' : 'partial';
+      const now = new Date().toISOString();
+
+      // Atualizar crédito com novos valores
+      const { error: updateError } = await supabase
+        .from('credits')
+        .update({
+          amount_paid: newAmountPaid,
+          remaining_balance: newRemainingBalance,
+          status: newStatus,
+          updated_at: now,
+          last_payment_at: now
+        })
+        .eq('id', creditId);
+
+      if (updateError) throw updateError;
+
       // Registrar pagamento
-      const { data: paymentData, error: paymentError } = await supabase
+      const { error: paymentError } = await supabase
         .from('credit_payments')
         .insert({
           credit_id: creditId,
           business_id: currentBusiness.id,
           amount,
           payment_method: paymentMethod
-        })
-        .select()
-        .single();
+        });
 
       if (paymentError) throw paymentError;
 
