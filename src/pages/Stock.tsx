@@ -55,6 +55,7 @@ export default function Stock() {
   const [adjustmentQuantity, setAdjustmentQuantity] = useState('');
   const [adjustmentReason, setAdjustmentReason] = useState('');
   const [newPrice, setNewPrice] = useState('');
+  const [newCostPrice, setNewCostPrice] = useState('');
   const [newType, setNewType] = useState<'drink' | 'meal' | 'cigarette'>('drink');
 
   const safeSearch = sanitizeSearchQuery(search);
@@ -91,6 +92,7 @@ export default function Stock() {
     if (product) {
       setSelectedProductId(productId);
       setNewPrice((product.price || 0).toString());
+      setNewCostPrice(product.costPrice ? product.costPrice.toString() : '');
       setPriceDialogOpen(true);
     }
   };
@@ -113,20 +115,26 @@ export default function Stock() {
 
   const handlePriceUpdate = () => {
     const price = parseFloat(newPrice);
+    const costPrice = newCostPrice ? parseFloat(newCostPrice) : undefined;
     
     if (!selectedProductId || isNaN(price) || price < 0) {
-      toast({ title: 'Preço inválido', variant: 'destructive' });
+      toast({ title: 'Preço de venda inválido', variant: 'destructive' });
       return;
     }
 
     const product = products.find(p => p.id === selectedProductId);
     if (!product) return;
 
-    updateProduct(selectedProductId, { price });
+    const updates: Partial<Product> = { price };
+    if (costPrice !== undefined && !isNaN(costPrice)) {
+      updates.costPrice = costPrice;
+    }
+
+    updateProduct(selectedProductId, updates);
 
     toast({
-      title: 'Preço atualizado',
-      description: `${product.name}: Venda ${price.toLocaleString('pt-MZ')} MT`,
+      title: 'Preços atualizados',
+      description: `${product.name}: Venda ${price.toLocaleString('pt-MZ')} MT${costPrice !== undefined && !isNaN(costPrice) ? ` | Custo ${costPrice.toLocaleString('pt-MZ')} MT` : ''}`,
     });
 
     setPriceDialogOpen(false);
@@ -560,12 +568,36 @@ export default function Stock() {
               />
             </div>
 
-            {newPrice && (
-              <div className="p-3 bg-muted rounded-lg">
-                <p className="text-sm text-muted-foreground">Preço Configurado</p>
-                <p className="text-lg font-semibold">
-                  {parseFloat(newPrice).toLocaleString('pt-MZ')} MT
-                </p>
+            <div className="space-y-2">
+              <Label>Preço de Custo (MT)</Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={newCostPrice}
+                onChange={(e) => setNewCostPrice(e.target.value)}
+                placeholder="Digite o preço de custo..."
+              />
+            </div>
+
+            {(newPrice || newCostPrice) && (
+              <div className="p-3 bg-muted rounded-lg space-y-1">
+                <p className="text-sm text-muted-foreground">Resumo</p>
+                {newPrice && (
+                  <p className="text-lg font-semibold">
+                    Venda: {parseFloat(newPrice).toLocaleString('pt-MZ')} MT
+                  </p>
+                )}
+                {newCostPrice && (
+                  <p className="text-sm text-muted-foreground">
+                    Custo: {parseFloat(newCostPrice).toLocaleString('pt-MZ')} MT
+                    {newPrice && parseFloat(newPrice) > 0 && (
+                      <span className="ml-2">
+                        Margem: {((parseFloat(newPrice) - parseFloat(newCostPrice)) / parseFloat(newPrice) * 100).toFixed(0)}%
+                      </span>
+                    )}
+                  </p>
+                )}
               </div>
             )}
 
