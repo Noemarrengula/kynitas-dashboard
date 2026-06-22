@@ -336,6 +336,7 @@ export default function SalesHistory() {
                             size="sm"
                             onClick={() => setSelectedSale(sale)}
                             title="Ver detalhes"
+                            aria-label="Ver detalhes"
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
@@ -344,6 +345,7 @@ export default function SalesHistory() {
                             size="sm"
                             onClick={() => reprintReceipt(sale)}
                             title="Reimprimir recibo"
+                            aria-label="Reimprimir recibo"
                           >
                             <Receipt className="h-4 w-4" />
                           </Button>

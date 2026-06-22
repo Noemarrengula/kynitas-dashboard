@@ -591,6 +591,7 @@ export default function Reports() {
                         size="sm"
                         onClick={() => setSelectedSale(sale)}
                         className="h-8 w-8 p-0"
+                        aria-label="Ver detalhes"
                       >
                         <Eye className="h-4 w-4" />
                       </Button>

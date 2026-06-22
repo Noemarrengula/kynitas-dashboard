@@ -665,6 +665,7 @@ export default function Sales() {
                     <button
                       onClick={() => removeItem(item.productId)}
                       className="text-destructive hover:bg-destructive/10 p-1 rounded"
+                      aria-label="Remover item"
                     >
                       <X className="h-4 w-4" />
                     </button>
@@ -679,6 +680,7 @@ export default function Sales() {
                       size="icon-sm"
                       onClick={() => updateItemQuantity(item.productId, -1)}
                       className="h-6 w-6"
+                      aria-label="Diminuir quantidade"
                     >
                       <Minus className="h-3 w-3" />
                     </Button>
@@ -688,6 +690,7 @@ export default function Sales() {
                       size="icon-sm"
                       onClick={() => updateItemQuantity(item.productId, 1)}
                       className="h-6 w-6"
+                      aria-label="Aumentar quantidade"
                     >
                       <Plus className="h-3 w-3" />
                     </Button>
@@ -758,11 +761,11 @@ export default function Sales() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="icon-sm" onClick={() => setBottleQty(Math.max(0, bottleQty - 1))}>
+                <Button variant="outline" size="icon-sm" onClick={() => setBottleQty(Math.max(0, bottleQty - 1))} aria-label="Diminuir quantidade">
                   <Minus className="h-3 w-3" />
                 </Button>
                 <span className="w-8 text-center font-medium">{bottleQty}</span>
-                <Button variant="outline" size="icon-sm" onClick={() => setBottleQty(bottleQty + 1)}>
+                <Button variant="outline" size="icon-sm" onClick={() => setBottleQty(bottleQty + 1)} aria-label="Aumentar quantidade">
                   <Plus className="h-3 w-3" />
                 </Button>
               </div>
@@ -778,11 +781,11 @@ export default function Sales() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" size="icon-sm" onClick={() => setShotQty(Math.max(0, shotQty - 1))}>
+                  <Button variant="outline" size="icon-sm" onClick={() => setShotQty(Math.max(0, shotQty - 1))} aria-label="Diminuir quantidade">
                     <Minus className="h-3 w-3" />
                   </Button>
                   <span className="w-8 text-center font-medium">{shotQty}</span>
-                  <Button variant="outline" size="icon-sm" onClick={() => setShotQty(shotQty + 1)}>
+                  <Button variant="outline" size="icon-sm" onClick={() => setShotQty(shotQty + 1)} aria-label="Aumentar quantidade">
                     <Plus className="h-3 w-3" />
                   </Button>
                 </div>

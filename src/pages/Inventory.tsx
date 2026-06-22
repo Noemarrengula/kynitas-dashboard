@@ -291,6 +291,7 @@ export default function Inventory() {
                     variant="ghost"
                     size="sm"
                     onClick={() => openDeductDialog(ingredient.id)}
+                    aria-label="Reduzir stock"
                   >
                     <Minus className="h-4 w-4" />
                   </Button>
@@ -298,6 +299,7 @@ export default function Inventory() {
                     variant="ghost"
                     size="sm"
                     onClick={() => openAdjustDialog(ingredient.id)}
+                    aria-label="Adicionar stock"
                   >
                     <Plus className="h-4 w-4" />
                   </Button>

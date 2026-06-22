@@ -434,6 +434,7 @@ export default function Stock() {
                         size="sm"
                         onClick={() => openTypeDialog(product.id)}
                         title="Alterar Tipo"
+                        aria-label="Alterar tipo"
                       >
                         <Tag className="h-4 w-4" />
                       </Button>
@@ -442,6 +443,7 @@ export default function Stock() {
                         size="sm"
                         onClick={() => openPriceDialog(product.id)}
                         title="Ajustar Preços"
+                        aria-label="Ajustar preços"
                       >
                         <DollarSign className="h-4 w-4" />
                       </Button>
@@ -450,6 +452,7 @@ export default function Stock() {
                         size="sm"
                         onClick={() => openAdjustDialog(product.id, 'adjust')}
                         title="Ajustar Stock"
+                        aria-label="Ajustar stock"
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -459,6 +462,7 @@ export default function Stock() {
                         onClick={() => openAdjustDialog(product.id, 'entry')}
                         className="text-success hover:text-success"
                         title="Entrada"
+                        aria-label="Entrada de stock"
                       >
                         <Plus className="h-4 w-4" />
                       </Button>
@@ -468,6 +472,7 @@ export default function Stock() {
                         onClick={() => openAdjustDialog(product.id, 'exit')}
                         className="text-destructive hover:text-destructive"
                         title="Saída"
+                        aria-label="Saída de stock"
                       >
                         <Minus className="h-4 w-4" />
                       </Button>

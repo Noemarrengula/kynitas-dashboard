@@ -483,7 +483,14 @@ export default function Tables() {
       </div>
 
       {/* Tables Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+      {tables.length === 0 ? (
+        <div className="text-center py-16 text-muted-foreground">
+          <Users className="h-16 w-16 mx-auto mb-4 opacity-30" />
+          <p className="text-lg font-medium">Nenhuma mesa cadastrada</p>
+          <p className="text-sm mt-1">Clique em "Nova Mesa" para começar</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
         {tables.map((table) => {
           const order = orders.find(o => o.id === table.currentOrderId);
           return (
@@ -535,13 +542,15 @@ export default function Tables() {
                 size="icon-sm"
                 className="manage-btn absolute top-2 right-2"
                 onClick={() => handleManageTable(table)}
+                aria-label="Gerir mesa"
               >
                 <Settings2 className="h-4 w-4" />
               </Button>
             </div>
           );
         })}
-      </div>
+        </div>
+      )}
 
       {/* Table Dialog */}
       <Dialog open={!!selectedTable} onOpenChange={() => setSelectedTable(null)}>
@@ -593,6 +602,7 @@ export default function Tables() {
                         <button
                           onClick={() => removeItem(item.productId)}
                           className="text-destructive hover:bg-destructive/10 p-1 rounded"
+                          aria-label="Remover item"
                         >
                           <X className="h-4 w-4" />
                         </button>
@@ -606,6 +616,7 @@ export default function Tables() {
                           variant="outline"
                           size="icon-sm"
                           onClick={() => updateItemQuantity(item.productId, -1)}
+                          aria-label="Diminuir quantidade"
                         >
                           <Minus className="h-3 w-3" />
                         </Button>
@@ -614,6 +625,7 @@ export default function Tables() {
                           variant="outline"
                           size="icon-sm"
                           onClick={() => updateItemQuantity(item.productId, 1)}
+                          aria-label="Aumentar quantidade"
                         >
                           <Plus className="h-3 w-3" />
                         </Button>
