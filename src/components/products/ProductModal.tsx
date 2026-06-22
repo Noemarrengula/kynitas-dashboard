@@ -146,7 +146,7 @@ export function ProductModal({ open, onClose, product, type }: ProductModalProps
         }
       }
       setLoading(false);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Erro inesperado:', err);
       toast({ title: 'Erro ao salvar produto', description: String(err), variant: 'destructive' });
       setLoading(false);

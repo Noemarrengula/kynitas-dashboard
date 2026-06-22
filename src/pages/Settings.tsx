@@ -10,6 +10,7 @@ import { useStore } from '@/store/useStore';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/hooks/use-toast';
+import { getErrorMessage } from '@/lib/utils';
 import { PrinterSettings } from '@/components/settings/PrinterSettings';
 import { BackupSettings } from '@/components/settings/BackupSettings';
 import { CashDrawerSettings } from '@/components/settings/CashDrawerSettings';
@@ -147,11 +148,11 @@ export default function Settings() {
       console.log('Negócio atualizado:', data);
       await refreshBusiness();
       toast({ title: 'Informações do negócio atualizadas!' });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao atualizar negócio:', error);
       toast({
         title: 'Erro ao atualizar',
-        description: error.message || 'Tente novamente',
+        description: getErrorMessage(error, 'Tente novamente'),
         variant: 'destructive',
       });
     }

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { getErrorMessage } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBusiness } from '@/contexts/BusinessContext';
 
@@ -77,14 +78,14 @@ export function useHealthCheck() {
             } catch (rslError) {
               result.lastError = `RLS policy error: ${rslError}`;
             }
-          } catch (err: any) {
-            result.lastError = `Database error: ${err.message}`;
+          } catch (err: unknown) {
+            result.lastError = `Database error: ${getErrorMessage(err)}`;
           }
         }
 
         setHealth(result);
-      } catch (error: any) {
-        result.lastError = `Health check error: ${error.message}`;
+      } catch (error: unknown) {
+        result.lastError = `Health check error: ${getErrorMessage(error)}`;
         setHealth(result);
       } finally {
         setChecking(false);

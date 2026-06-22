@@ -26,6 +26,7 @@ export function PaymentModal({ open, onClose, totalAmount, onConfirm, onCredit }
   const [card, setCard] = useState('');
   const [isCredit, setIsCredit] = useState(false);
   const [customerName, setCustomerName] = useState('');
+  const [error, setError] = useState('');
 
   const cashValue = parseFloat(cash) || 0;
   const mpesaValue = parseFloat(mpesa) || 0;
@@ -33,7 +34,7 @@ export function PaymentModal({ open, onClose, totalAmount, onConfirm, onCredit }
   const cardValue = parseFloat(card) || 0;
 
   const totalReceived = cashValue + mpesaValue + emolaValue + cardValue;
-  const change = totalReceived - totalAmount;
+  const change = Math.max(0, totalReceived - totalAmount);
   const isValid = totalReceived >= totalAmount;
 
   const handleConfirm = () => {
@@ -50,7 +51,7 @@ export function PaymentModal({ open, onClose, totalAmount, onConfirm, onCredit }
 
   const handleCredit = () => {
     if (!customerName.trim()) {
-      alert('Digite o nome do cliente');
+      setError('Digite o nome do cliente');
       return;
     }
     if (onCredit) {
@@ -66,6 +67,7 @@ export function PaymentModal({ open, onClose, totalAmount, onConfirm, onCredit }
     setCard('');
     setCustomerName('');
     setIsCredit(false);
+    setError('');
   };
 
   const handleClose = () => {
@@ -87,6 +89,12 @@ export function PaymentModal({ open, onClose, totalAmount, onConfirm, onCredit }
             <p className="text-2xl font-bold" aria-label={`Total a pagar: ${formatCurrency(totalAmount)}`}>{formatCurrency(totalAmount)}</p>
           </div>
 
+          {error && (
+            <div className="bg-destructive/10 p-3 rounded-lg border border-destructive/20">
+              <p className="text-sm text-destructive">{error}</p>
+            </div>
+          )}
+
           {isCredit ? (
             <div className="space-y-4">
               <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
@@ -101,7 +109,7 @@ export function PaymentModal({ open, onClose, totalAmount, onConfirm, onCredit }
                   type="text"
                   placeholder="Ex: João Silva"
                   value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
+                  onChange={(e) => { setCustomerName(e.target.value); setError(''); }}
                 />
               </div>
             </div>
@@ -176,7 +184,7 @@ export function PaymentModal({ open, onClose, totalAmount, onConfirm, onCredit }
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Troco:</span>
                     <span className={`font-bold ${change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {formatCurrency(Math.max(0, change))}
+                      {formatCurrency(change)}
                     </span>
                   </div>
                 )}

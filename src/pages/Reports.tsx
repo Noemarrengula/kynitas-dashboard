@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { BarChart3, Download, Calendar, TrendingUp, DollarSign, ShoppingCart, Package, Banknote, CreditCard, Smartphone, Eye, Printer, Trash2, FileSpreadsheet, Check, Users } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, getErrorMessage } from '@/lib/utils';
 import { SaleDetailsModal } from '@/components/sales/SaleDetailsModal';
 import { Sale, Credit } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -274,7 +274,7 @@ export default function Reports() {
             <FileSpreadsheet className="h-4 w-4 mr-2" />
             Top Excel
           </Button>
-          <Button variant="outline" onClick={() => { try { exportStockEvolutionToPDF(products, sales, range.start, range.end, business?.name || 'Relatório', `evolucao-stock-${format(new Date(), 'yyyy-MM-dd')}.pdf`); toast({ title: 'Evolução de Stock PDF exportada!' }); } catch (e: any) { toast({ title: 'Erro ao exportar', description: e?.message || 'Erro desconhecido', variant: 'destructive' }); } }}>
+          <Button variant="outline" onClick={() => { try { exportStockEvolutionToPDF(products, sales, range.start, range.end, business?.name || 'Relatório', `evolucao-stock-${format(new Date(), 'yyyy-MM-dd')}.pdf`); toast({ title: 'Evolução de Stock PDF exportada!' }); } catch (e: unknown) { toast({ title: 'Erro ao exportar', description: getErrorMessage(e), variant: 'destructive' }); } }}>
             <FileSpreadsheet className="h-4 w-4 mr-2" />
             Evolução Stock PDF
           </Button>

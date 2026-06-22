@@ -84,11 +84,12 @@ export function useDatabase() {
   const maxRetries = 3;
 
   // Função auxiliar para tratamento de erros
-  const handleError = (err: any, operation: string) => {
+  const handleError = (err: unknown, operation: string) => {
+    const message = err instanceof Error ? err.message : (typeof err === 'string' ? err : 'Erro desconhecido');
     const errorObj: DatabaseError = {
-      message: err?.message || 'Erro desconhecido',
-      code: err?.code,
-      details: err?.details,
+      message,
+      code: err && typeof err === 'object' && 'code' in err ? String((err as Record<string, unknown>).code) : undefined,
+      details: err && typeof err === 'object' && 'details' in err ? String((err as Record<string, unknown>).details) : undefined,
     };
     
     console.error(`[${operation}]`, errorObj);
@@ -119,87 +120,33 @@ export function useDatabase() {
         setLoading(true);
         setError(null);
 
-        // Carregar produtos com timeout
-        const { data: productsData, error: productsError } = await Promise.race([
-          supabase
-            .from('products')
-            .select('*')
-            .eq('business_id', currentBusiness.id),
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Timeout ao carregar produtos')), 10000)
-          ) as any
-        ]).catch(err => ({ data: null, error: err }));
+        try {
+          const [productsRes, ingredientsRes, salesRes, creditsRes] = await Promise.all([
+            supabase.from('products').select('*').eq('business_id', currentBusiness.id),
+            supabase.from('ingredients').select('*').eq('business_id', currentBusiness.id),
+            supabase.from('sales').select('*').eq('business_id', currentBusiness.id).order('created_at', { ascending: false }).limit(2000),
+            supabase.from('credits').select('*').eq('business_id', currentBusiness.id).order('created_at', { ascending: false }),
+          ]);
 
-        if (productsError) {
-          console.warn('Erro ao carregar produtos:', productsError);
-        }
-
-        // Carregar ingredientes com timeout
-        const { data: ingredientsData, error: ingredientsError } = await Promise.race([
-          supabase
-            .from('ingredients')
-            .select('*')
-            .eq('business_id', currentBusiness.id),
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Timeout ao carregar ingredientes')), 10000)
-          ) as any
-        ]).catch(err => ({ data: null, error: err }));
-
-        if (ingredientsError) {
-          console.warn('Erro ao carregar ingredientes:', ingredientsError);
-        }
-
-        // Carregar TODAS as vendas (sem limite de data)
-        const { data: salesData, error: salesError } = await Promise.race([
-          supabase
-            .from('sales')
-            .select('*')
-            .eq('business_id', currentBusiness.id)
-            .order('created_at', { ascending: false })
-            .limit(2000), // Aumentar limite para 2000 registros
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Timeout ao carregar vendas')), 10000)
-          ) as any
-        ]).catch(err => ({ data: null, error: err }));
-
-        if (salesError) {
-          console.warn('Erro ao carregar vendas:', salesError);
-        }
-
-        // Carregar créditos/dívidas
-        const { data: creditsData, error: creditsError } = await Promise.race([
-          supabase
-            .from('credits')
-            .select('*')
-            .eq('business_id', currentBusiness.id)
-            .order('created_at', { ascending: false }),
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Timeout ao carregar créditos')), 10000)
-          ) as any
-        ]).catch(err => ({ data: null, error: err }));
-
-        if (creditsError) {
-          console.warn('Erro ao carregar créditos:', creditsError);
-        }
+          const productsData = productsRes.data;
+          const ingredientsData = ingredientsRes.data;
+          const salesData = salesRes.data;
+          const creditsData = creditsRes.data;
 
         // Atualizar estado com dados carregados
         if (productsData) setProducts(productsData.map(p => toCamelCase(p) as Product));
-        if (ingredientsData) setIngredients(ingredientsData);
+        if (ingredientsData) setIngredients(ingredientsData.map(i => toCamelCase(i) as Ingredient));
         
         // Transformar dados do Supabase para o formato esperado
         if (salesData) {
-          const transformedSales = salesData.map(sale => ({
-            id: sale.id,
-            saleNumber: sale.sale_number,
-            items: sale.items,
-            total: sale.total,
-            paymentDetails: sale.payment_details || {},
-            tableId: sale.table_id,
-            table_number: sale.table_number,
-            table_name: sale.table_name,
-            table_customer_name: sale.table_customer_name,
-            createdAt: sale.created_at
-          }));
+          const transformedSales = salesData.map(sale => {
+            const c = toCamelCase(sale);
+            return {
+              ...c,
+              paymentDetails: sale.payment_details || {},
+              createdAt: sale.created_at,
+            } as unknown as Sale;
+          });
           setSales(transformedSales);
         }
 
@@ -227,7 +174,7 @@ export function useDatabase() {
         setLoading(false);
         setRetryCount(0);
 
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error(`Erro ao carregar dados (tentativa ${attempt + 1}/${maxRetries}):`, err);
         
         // Retry automático
@@ -270,7 +217,7 @@ export function useDatabase() {
         });
       }
       return { data, error: null };
-    } catch (err: any) {
+    } catch (err: unknown) {
       return handleError(err, 'ADD_PRODUCT');
     }
   };
@@ -280,6 +227,7 @@ export function useDatabase() {
       if (!currentBusiness?.id) {
         throw new Error('Negócio não encontrado');
       }
+      if (!id) throw new Error('ID do produto é obrigatório');
 
       const { id: _unused, ...cleanUpdates } = updates;
       const { data, error } = await supabase
@@ -300,7 +248,7 @@ export function useDatabase() {
         });
       }
       return { data, error: null };
-    } catch (err: any) {
+    } catch (err: unknown) {
       return handleError(err, 'UPDATE_PRODUCT');
     }
   };
@@ -325,7 +273,7 @@ export function useDatabase() {
         description: 'Produto foi deletado com sucesso',
       });
       return { error: null };
-    } catch (err: any) {
+    } catch (err: unknown) {
       return handleError(err, 'DELETE_PRODUCT');
     }
   };
@@ -339,21 +287,21 @@ export function useDatabase() {
 
       const { data, error } = await supabase
         .from('ingredients')
-        .insert([{ ...ingredient }])
+        .insert([{ ...toSnakeCase(ingredient as Record<string, any>) }])
         .select()
         .single();
 
       if (error) throw error;
 
       if (data) {
-        setIngredients([...ingredients, data]);
+        setIngredients([...ingredients, toCamelCase(data) as Ingredient]);
         toast({
           title: 'Ingrediente criado',
           description: `${ingredient.name} foi adicionado com sucesso`,
         });
       }
       return { data, error: null };
-    } catch (err: any) {
+    } catch (err: unknown) {
       return handleError(err, 'ADD_INGREDIENT');
     }
   };
@@ -366,18 +314,19 @@ export function useDatabase() {
 
       const { data, error } = await supabase
         .from('ingredients')
-        .update(updates)
+        .update(toSnakeCase(updates as Record<string, any>))
         .eq('id', id)
+        .eq('business_id', currentBusiness.id)
         .select()
         .single();
 
       if (error) throw error;
 
       if (data) {
-        setIngredients(ingredients.map(i => i.id === id ? data : i));
+        setIngredients(ingredients.map(i => i.id === id ? toCamelCase(data) as Ingredient : i));
       }
       return { data, error: null };
-    } catch (err: any) {
+    } catch (err: unknown) {
       return handleError(err, 'UPDATE_INGREDIENT');
     }
   };
@@ -391,7 +340,8 @@ export function useDatabase() {
       const { error } = await supabase
         .from('ingredients')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .eq('business_id', currentBusiness.id);
 
       if (error) throw error;
 
@@ -400,7 +350,7 @@ export function useDatabase() {
         title: 'Ingrediente removido',
       });
       return { error: null };
-    } catch (err: any) {
+    } catch (err: unknown) {
       return handleError(err, 'DELETE_INGREDIENT');
     }
   };
@@ -449,8 +399,7 @@ export function useDatabase() {
 
       console.log('[ADD_SALE] Venda inserida com sucesso:', data);
         
-      // Transformar dados para formato camelCase
-      const transformedSale = {
+      const transformedSale: Sale = {
         id: data.id,
         saleNumber: data.sale_number,
         items: data.items,
@@ -460,7 +409,7 @@ export function useDatabase() {
         table_number: data.table_number,
         table_name: data.table_name,
         table_customer_name: data.table_customer_name,
-        createdAt: data.created_at
+        createdAt: data.created_at,
       };
       
       setSales([transformedSale, ...sales]);
@@ -485,13 +434,13 @@ export function useDatabase() {
       setProducts(updatedProducts);
 
       return { data: transformedSale, error: null };
-    } catch (err: any) {
+    } catch (err: unknown) {
       return handleError(err, 'ADD_SALE');
     }
   };
 
   // CRÉDITOS/DÍVIDAS
-  const addCredit = async (credit: Omit<Credit, 'id' | 'createdAt' | 'updatedAt' | 'amountPaid' | 'remainingBalance'> & { status?: 'pending' | 'partial' | 'paid' }) => {
+  const addCredit = async (credit: Omit<Credit, 'id' | 'createdAt' | 'updatedAt' | 'amountPaid' | 'remainingBalance'>) => {
     try {
       if (!currentBusiness?.id) {
         throw new Error('Negócio não encontrado. Faça login novamente.');
@@ -540,7 +489,7 @@ export function useDatabase() {
       });
 
       return { data: transformedCredit, error: null };
-    } catch (err: any) {
+    } catch (err: unknown) {
       return handleError(err, 'ADD_CREDIT');
     }
   };
@@ -625,7 +574,7 @@ export function useDatabase() {
       });
 
       return { data: transformedCredit, error: null };
-    } catch (err: any) {
+    } catch (err: unknown) {
       return handleError(err, 'PAY_CREDIT');
     }
   };
@@ -659,7 +608,7 @@ export function useDatabase() {
       }));
 
       setCredits(transformedCredits);
-    } catch (err: any) {
+    } catch (err: unknown) {
       handleError(err, 'LOAD_CREDITS');
     }
   };
@@ -686,7 +635,7 @@ export function useDatabase() {
       });
 
       return { error: null };
-    } catch (err: any) {
+    } catch (err: unknown) {
       return handleError(err, 'DELETE_CREDIT');
     }
   };
@@ -750,37 +699,22 @@ export function useDatabase() {
       if (salesError) throw salesError;
 
       if (salesData) {
-        const transformedSales = salesData.map(sale => ({
-          id: sale.id,
-          saleNumber: sale.sale_number,
-          items: sale.items,
-          total: sale.total,
-          paymentDetails: sale.payment_details || {},
-          tableId: sale.table_id,
-          table_number: sale.table_number,
-          table_name: sale.table_name,
-          table_customer_name: sale.table_customer_name,
-          createdAt: sale.created_at
-        }));
-        setSales(transformedSales);
-        
-        toast({
-          title: 'Histórico carregado',
-          description: `${transformedSales.length} vendas carregadas com sucesso`,
+        const transformedSales = salesData.map(sale => {
+          const c = toCamelCase(sale);
+          return {
+            ...c,
+            paymentDetails: sale.payment_details || {},
+            createdAt: sale.created_at,
+          } as unknown as Sale;
         });
+        setSales(transformedSales);
       }
       
       return { data: salesData, error: null };
-    } catch (err: any) {
+    } catch (err: unknown) {
       return handleError(err, 'LOAD_ALL_SALES');
     }
   };
-
-  // Aliases para compatibilidade
-  const getSales = async () => sales;
-  const createSale = addSale;
-  const getProducts = async () => products;
-  const createProduct = addProduct;
 
   return {
     loading,
@@ -799,10 +733,6 @@ export function useDatabase() {
     updateIngredient,
     deleteIngredient,
     addSale,
-    getSales,
-    createSale,
-    getProducts,
-    createProduct,
     loadAllSales,
     addCredit,
     payCredit,

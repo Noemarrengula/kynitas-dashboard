@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Users, Plus, Minus, X, Check, Settings2, PlusCircle, Receipt } from 'lucide-react';
+import { Users, Minus, X, Check, Settings2, PlusCircle, Receipt } from 'lucide-react';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { PaymentModal } from '@/components/sales/PaymentModal';
 import { useDatabase } from '@/hooks/useDatabase';
@@ -13,23 +13,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { useStore } from '@/store/useStore';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Table, Order, OrderItem, Product } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
+import { cn, getErrorMessage } from '@/lib/utils';
 import { TableManagementModal } from '@/components/tables/TableManagementModal';
 import { NewTableModal } from '@/components/tables/NewTableModal';
 import { useTablesPersistence } from '@/hooks/useTablesPersistence';
 import { useCredits } from '@/hooks/useCredits';
+import { printReceipt } from '@/lib/receipt';
 
 const statusLabels = {
   free: 'Livre',
@@ -197,20 +190,26 @@ export default function Tables() {
         updateOrder(selectedTable.currentOrderId, { status: 'paid' });
       }
 
-      await supabase.from('tables_history').insert({
-        business_id: business?.id,
-        table_id: selectedTable.id,
-        table_number: selectedTable.number,
-        table_name: selectedTable.name,
-        customer_name: selectedTable.customer_name,
-        status: 'closed',
-        opened_at: selectedTable.opened_at?.toISOString(),
-        closed_at: new Date().toISOString(),
-        total_amount: total,
-        sale_id: saleResult.data?.id,
-      }).maybeSingle();
+      try {
+        await supabase.from('tables_history').insert({
+          business_id: business?.id,
+          table_id: selectedTable.id,
+          table_number: selectedTable.number,
+          table_name: selectedTable.name,
+          customer_name: selectedTable.customer_name,
+          status: 'closed',
+          opened_at: selectedTable.opened_at?.toISOString(),
+          closed_at: new Date().toISOString(),
+          total_amount: total,
+          sale_id: saleResult.data?.id,
+        });
+      } catch (histErr) {
+        console.warn('Erro ao arquivar histórico da mesa:', histErr);
+      }
 
-      const updatedTables = tables.filter(t => t.id !== selectedTable.id);
+      const updatedTables = tables.map(t => t.id === selectedTable.id
+        ? { ...t, status: 'free' as const, currentOrderId: undefined, customer_name: undefined, closed_at: new Date() }
+        : t);
       setTables(updatedTables);
       setShowPaymentModal(false);
       setSelectedTable(null);
@@ -245,7 +244,7 @@ export default function Tables() {
       });
 
       // Imprimir recibo diretamente
-      printReceiptDirect(saleData);
+      printReceipt(saleData, 'merchant', business);
 
       if (lowStockItems.length > 0 || lowIngredients.length > 0) {
       setTimeout(() => {
@@ -267,135 +266,6 @@ export default function Tables() {
         variant: 'destructive',
       });
     }
-  };
-
-  const printReceiptDirect = (sale: any) => {
-    try {
-      const printWindow = window.open('', '_blank');
-      if (!printWindow) {
-        toast({
-          title: 'Bloqueio de popup',
-          description: 'Permita popups para imprimir',
-          variant: 'destructive'
-        });
-        return;
-      }
-
-      const receiptHTML = generateReceiptHTML(sale);
-      printWindow.document.write(receiptHTML);
-      printWindow.document.close();
-      
-      setTimeout(() => {
-        printWindow.print();
-        setTimeout(() => printWindow.close(), 500);
-      }, 500);
-    } catch (error) {
-      console.error('Erro ao imprimir:', error);
-    }
-  };
-
-  const generateReceiptHTML = (sale: any) => {
-    const formatCurrency = (value: number) => `${value.toFixed(2)} MT`;
-    const centerText = (text: string, width = 48) => {
-      const padding = Math.max(0, Math.floor((width - text.length) / 2));
-      return ' '.repeat(padding) + text;
-    };
-    const line = (char: string, width = 48) => char.repeat(width);
-    const formatLine = (left: string, right: string, width = 48) => {
-      const spaces = width - left.length - right.length;
-      return left + ' '.repeat(Math.max(1, spaces)) + right;
-    };
-
-    const receipt = [];
-    receipt.push(centerText('KYNITAS BAR'));
-    receipt.push(centerText('Bar & Restaurante'));
-    receipt.push('');
-    receipt.push(line('='));
-    receipt.push('');
-    receipt.push('Data: ' + new Date(sale.createdAt).toLocaleString('pt-MZ'));
-    receipt.push('Recibo: #' + sale.id.slice(0, 8).toUpperCase());
-    if (sale.tableId) receipt.push('Mesa: ' + sale.tableId);
-    receipt.push('');
-    receipt.push(line('-'));
-    receipt.push('');
-    receipt.push('ITENS:');
-    receipt.push('');
-    
-    sale.items.forEach((item: any) => {
-      receipt.push(item.product?.name ?? 'Produto');
-      receipt.push(formatLine(`  ${item.quantity}x ${formatCurrency(item.product?.price ?? 0)}`, formatCurrency(item.subtotal)));
-    });
-    
-    receipt.push('');
-    receipt.push(line('-'));
-    receipt.push('');
-    receipt.push(formatLine('TOTAL:', formatCurrency(sale.total)));
-    receipt.push('');
-    receipt.push(line('-'));
-    receipt.push('');
-    receipt.push('PAGAMENTO:');
-    receipt.push('');
-    
-    if (sale.paymentDetails.cash > 0) {
-      receipt.push(formatLine('  Numerario:', formatCurrency(sale.paymentDetails.cash)));
-    }
-    if (sale.paymentDetails.mpesa > 0) {
-      receipt.push(formatLine('  M-Pesa:', formatCurrency(sale.paymentDetails.mpesa)));
-    }
-    if (sale.paymentDetails.emola > 0) {
-      receipt.push(formatLine('  E-Mola:', formatCurrency(sale.paymentDetails.emola)));
-    }
-    if (sale.paymentDetails.card > 0) {
-      receipt.push(formatLine('  Cartao:', formatCurrency(sale.paymentDetails.card)));
-    }
-    
-    receipt.push('');
-    receipt.push(formatLine('Total Recebido:', formatCurrency(sale.paymentDetails.total)));
-    
-    if (sale.paymentDetails.change > 0) {
-      receipt.push(formatLine('Troco:', formatCurrency(sale.paymentDetails.change)));
-    }
-    
-    receipt.push('');
-    receipt.push(line('='));
-    receipt.push('');
-    receipt.push(centerText('Obrigado pela preferencia!'));
-    receipt.push(centerText('Volte sempre!'));
-    receipt.push('');
-    receipt.push(centerText('Documento nao serve como fatura'));
-
-    return `<!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="UTF-8">
-          <title>Recibo</title>
-          <style>
-            @page { size: 80mm auto; margin: 0; }
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body { 
-              font-family: 'Courier New', monospace;
-              font-size: 12px;
-              line-height: 1.3;
-              width: 80mm;
-              padding: 5mm;
-              background: white;
-              color: #000;
-            }
-            pre { 
-              margin: 0;
-              white-space: pre;
-              font-family: inherit;
-              color: #000;
-              font-weight: bold;
-            }
-            @media print {
-              body { padding: 2mm; color: #000 !important; }
-              pre { color: #000 !important; font-weight: bold !important; }
-            }
-          </style>
-        </head>
-        <body><pre>${receipt.join('\n')}</pre></body>
-      </html>`;
   };
 
   const printPreBill = () => {
@@ -549,8 +419,11 @@ export default function Tables() {
     }
 
     try {
+      const customerName = creditCustomerName.trim();
+      const itemCount = orderItems.length;
+
       const result = await registerCreditCharge(
-        creditCustomerName.trim(),
+        customerName,
         orderItems,
         total
       );
@@ -568,13 +441,13 @@ export default function Tables() {
 
       toast({
         title: 'Crédito registado com sucesso!',
-        description: `${creditCustomerName} levará ${orderItems.length} produto(s)`,
+        description: `${customerName} levará ${itemCount} produto(s)`,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao registar crédito:', error);
       toast({
         title: 'Erro ao registar crédito',
-        description: error?.message || 'Tente novamente',
+        description: getErrorMessage(error, 'Tente novamente'),
         variant: 'destructive',
       });
     }

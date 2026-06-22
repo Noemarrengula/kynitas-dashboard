@@ -3,6 +3,7 @@ import { User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
+import { getErrorMessage } from '@/lib/utils';
 
 interface AuthContextType {
   user: User | null;
@@ -48,10 +49,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         description: "Bem-vindo de volta.",
       });
       navigate('/');
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro ao fazer login",
-        description: error.message,
+        description: getErrorMessage(error),
         variant: "destructive",
       });
       throw error;
@@ -86,10 +87,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         description: "Verifique seu email para confirmar a conta.",
       });
       navigate('/login');
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro ao criar conta",
-        description: error.message,
+        description: getErrorMessage(error),
         variant: "destructive",
       });
       throw error;
@@ -106,10 +107,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         description: "Até logo!",
       });
       navigate('/login');
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro ao fazer logout",
-        description: error.message,
+        description: getErrorMessage(error),
         variant: "destructive",
       });
     }

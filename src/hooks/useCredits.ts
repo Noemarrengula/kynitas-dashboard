@@ -1,35 +1,69 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useToast } from '@/hooks/use-toast';
+import { getErrorMessage } from '@/lib/utils';
 
 export interface Customer {
   id: string;
-  business_id: string;
+  businessId: string;
   name: string;
   phone?: string;
   email?: string;
   address?: string;
-  credit_limit: number;
-  current_balance: number;
+  creditLimit: number;
+  currentBalance: number;
   status: 'active' | 'blocked' | 'inactive';
   notes?: string;
-  created_at: string;
-  updated_at: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface CreditTransaction {
   id: string;
-  business_id: string;
-  customer_id: string;
+  businessId: string;
+  customerId: string;
   type: 'charge' | 'payment' | 'adjustment';
   amount: number;
-  balance_before: number;
-  balance_after: number;
-  sale_id?: string;
-  payment_method?: string;
+  balanceBefore: number;
+  balanceAfter: number;
+  saleId?: string;
+  paymentMethod?: string;
   description?: string;
-  created_at: string;
+  createdAt: string;
+}
+
+function toCustomer(db: any): Customer {
+  return {
+    id: db.id,
+    businessId: db.business_id,
+    name: db.name,
+    phone: db.phone,
+    email: db.email,
+    address: db.address,
+    creditLimit: db.credit_limit ?? 0,
+    currentBalance: db.current_balance ?? 0,
+    status: db.status,
+    notes: db.notes,
+    createdAt: db.created_at,
+    updatedAt: db.updated_at,
+  };
+}
+
+function toCreditTransaction(db: any): CreditTransaction {
+  return {
+    id: db.id,
+    businessId: db.business_id,
+    customerId: db.customer_id,
+    type: db.type,
+    amount: db.amount,
+    balanceBefore: db.balance_before,
+    balanceAfter: db.balance_after,
+    saleId: db.sale_id,
+    paymentMethod: db.payment_method,
+    description: db.description,
+    createdAt: db.created_at,
+  };
 }
 
 export function useCredits() {
@@ -38,6 +72,8 @@ export function useCredits() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [transactions, setTransactions] = useState<CreditTransaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const customersRef = useRef(customers);
+  customersRef.current = customers;
 
   useEffect(() => {
     if (!currentBusiness?.id) {
@@ -49,7 +85,7 @@ export function useCredits() {
 
   const loadData = async () => {
     if (!currentBusiness?.id) return;
-    
+
     setLoading(true);
     try {
       const [customersRes, transactionsRes] = await Promise.all([
@@ -66,12 +102,12 @@ export function useCredits() {
           .limit(100)
       ]);
 
-      if (customersRes.data) setCustomers(customersRes.data);
-      if (transactionsRes.data) setTransactions(transactionsRes.data);
-    } catch (error: any) {
+      if (customersRes.data) setCustomers(customersRes.data.map(toCustomer));
+      if (transactionsRes.data) setTransactions(transactionsRes.data.map(toCreditTransaction));
+    } catch (error: unknown) {
       toast({
         title: 'Erro ao carregar dados',
-        description: error.message,
+        description: getErrorMessage(error),
         variant: 'destructive',
       });
     } finally {
@@ -79,24 +115,34 @@ export function useCredits() {
     }
   };
 
-  const addCustomer = async (customer: Omit<Customer, 'id' | 'business_id' | 'created_at' | 'updated_at'>) => {
+  const addCustomer = async (customer: Omit<Customer, 'id' | 'businessId' | 'createdAt' | 'updatedAt'>) => {
     try {
       const { data, error } = await supabase
         .from('customers')
-        .insert([{ ...customer, business_id: currentBusiness?.id }])
+        .insert([{
+          name: customer.name,
+          phone: customer.phone,
+          email: customer.email,
+          address: customer.address,
+          credit_limit: customer.creditLimit ?? 0,
+          current_balance: customer.currentBalance ?? 0,
+          status: customer.status || 'active',
+          notes: customer.notes,
+          business_id: currentBusiness?.id,
+        }])
         .select()
         .single();
 
       if (error) throw error;
       if (data) {
-        setCustomers([...customers, data]);
+        setCustomers([...customers, toCustomer(data)]);
         toast({ title: 'Cliente cadastrado com sucesso!' });
       }
-      return { data, error: null };
-    } catch (error: any) {
+      return { data: data ? toCustomer(data) : null, error: null };
+    } catch (error: unknown) {
       toast({
         title: 'Erro ao cadastrar cliente',
-        description: error.message,
+        description: getErrorMessage(error),
         variant: 'destructive',
       });
       return { data: null, error };
@@ -105,9 +151,19 @@ export function useCredits() {
 
   const updateCustomer = async (id: string, updates: Partial<Customer>) => {
     try {
+      const dbUpdates: Record<string, any> = {};
+      if (updates.name !== undefined) dbUpdates.name = updates.name;
+      if (updates.phone !== undefined) dbUpdates.phone = updates.phone;
+      if (updates.email !== undefined) dbUpdates.email = updates.email;
+      if (updates.address !== undefined) dbUpdates.address = updates.address;
+      if (updates.creditLimit !== undefined) dbUpdates.credit_limit = updates.creditLimit;
+      if (updates.currentBalance !== undefined) dbUpdates.current_balance = updates.currentBalance;
+      if (updates.status !== undefined) dbUpdates.status = updates.status;
+      if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
+
       const { data, error } = await supabase
         .from('customers')
-        .update(updates)
+        .update(dbUpdates)
         .eq('id', id)
         .eq('business_id', currentBusiness?.id)
         .select()
@@ -115,14 +171,14 @@ export function useCredits() {
 
       if (error) throw error;
       if (data) {
-        setCustomers(customers.map(c => c.id === id ? data : c));
+        setCustomers(customers.map(c => c.id === id ? toCustomer(data) : c));
         toast({ title: 'Cliente atualizado com sucesso!' });
       }
-      return { data, error: null };
-    } catch (error: any) {
+      return { data: data ? toCustomer(data) : null, error: null };
+    } catch (error: unknown) {
       toast({
         title: 'Erro ao atualizar cliente',
-        description: error.message,
+        description: getErrorMessage(error),
         variant: 'destructive',
       });
       return { data: null, error };
@@ -145,7 +201,7 @@ export function useCredits() {
       });
 
       if (error) throw error;
-      
+
       if (data?.success) {
         await loadData();
         toast({ title: 'Pagamento registrado com sucesso!' });
@@ -153,40 +209,20 @@ export function useCredits() {
       } else {
         throw new Error(data?.error || 'Erro ao registrar pagamento');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Erro ao registrar pagamento',
-        description: error.message,
+        description: getErrorMessage(error),
         variant: 'destructive',
       });
-      return { success: false, error: error.message };
-    }
-  };
-
-  const getCustomerTransactions = async (customerId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('credit_transactions')
-        .select('*')
-        .eq('customer_id', customerId)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      return data || [];
-    } catch (error: any) {
-      toast({
-        title: 'Erro ao carregar histórico',
-        description: error.message,
-        variant: 'destructive',
-      });
-      return [];
+      return { success: false, error: getErrorMessage(error) };
     }
   };
 
   const findOrCreateCustomer = async (name: string): Promise<Customer | null> => {
     if (!currentBusiness?.id) return null;
 
-    const existing = customers.find(c => c.name.toLowerCase() === name.toLowerCase());
+    const existing = customersRef.current.find(c => c.name.toLowerCase() === name.toLowerCase());
     if (existing) return existing;
 
     const { data, error } = await supabase
@@ -202,8 +238,9 @@ export function useCredits() {
       .single();
 
     if (!error && data) {
-      setCustomers([...customers, data]);
-      return data;
+      const customer = toCustomer(data);
+      setCustomers([...customers, customer]);
+      return customer;
     }
     return null;
   };
@@ -236,13 +273,33 @@ export function useCredits() {
       } else {
         throw new Error(data?.error || 'Erro ao registrar venda a crédito');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Erro ao registrar venda a crédito',
-        description: error.message,
+        description: getErrorMessage(error),
         variant: 'destructive',
       });
-      return { success: false, error: error.message };
+      return { success: false, error: getErrorMessage(error) };
+    }
+  };
+
+  const getCustomerTransactions = async (customerId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('credit_transactions')
+        .select('*')
+        .eq('customer_id', customerId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return (data || []).map(toCreditTransaction);
+    } catch (error: unknown) {
+      toast({
+        title: 'Erro ao carregar histórico',
+        description: getErrorMessage(error),
+        variant: 'destructive',
+      });
+      return [];
     }
   };
 

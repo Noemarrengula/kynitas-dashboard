@@ -13,6 +13,7 @@ import { useBusiness } from '@/contexts/BusinessContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
+import { getErrorMessage } from '@/lib/utils';
 
 interface BusinessStats {
   id: string;
@@ -114,11 +115,11 @@ export function CentralAdminPanel() {
       }
 
       setBusinessStats(stats);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao carregar estatísticas:', error);
       toast({
         title: "Erro ao carregar dados",
-        description: error.message,
+        description: getErrorMessage(error),
         variant: "destructive",
       });
     }
@@ -150,11 +151,11 @@ export function CentralAdminPanel() {
       })) || [];
 
       setAllUsers(users);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao carregar usuários:', error);
       toast({
         title: "Erro ao carregar usuários",
-        description: error.message,
+        description: getErrorMessage(error),
         variant: "destructive",
       });
     } finally {
@@ -177,10 +178,10 @@ export function CentralAdminPanel() {
       });
 
       loadBusinessStats();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro ao atualizar status",
-        description: error.message,
+        description: getErrorMessage(error),
         variant: "destructive",
       });
     }
@@ -201,10 +202,10 @@ export function CentralAdminPanel() {
       });
 
       loadAllUsers();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro ao atualizar usuário",
-        description: error.message,
+        description: getErrorMessage(error),
         variant: "destructive",
       });
     }

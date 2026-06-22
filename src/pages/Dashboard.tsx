@@ -1,4 +1,4 @@
-import { DollarSign, ShoppingCart, AlertTriangle, TrendingUp, Banknote, CreditCard, Smartphone, Package, Calendar } from 'lucide-react';
+import { DollarSign, ShoppingCart, AlertTriangle, TrendingUp, Banknote, CreditCard, Smartphone, Package, Calendar, Loader2 } from 'lucide-react';
 import { MetricCard } from '@/components/dashboard/MetricCard';
 import { SalesChart } from '@/components/dashboard/SalesChart';
 import { TopProducts } from '@/components/dashboard/TopProducts';
@@ -10,6 +10,7 @@ import { TopTablesCard } from '@/components/dashboard/TopTablesCard';
 import { useDatabase } from '@/hooks/useDatabase';
 import { useStore } from '@/store/useStore';
 import { formatCurrency } from '@/lib/utils';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { startOfWeek, startOfMonth, endOfWeek, endOfMonth } from 'date-fns';
@@ -70,6 +71,14 @@ export default function Dashboard() {
     { name: 'E-Mola', value: todayPayments.emola, color: '#8b5cf6' },
     { name: 'Cartão', value: todayPayments.card, color: '#f59e0b' },
   ].filter(m => m.value > 0);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <LoadingSpinner size="lg" text="Carregando dashboard..." />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

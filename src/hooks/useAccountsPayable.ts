@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { toast } from './use-toast';
+import { getErrorMessage } from '@/lib/utils';
 import { AccountPayable, ExpenseCategory } from '@/types';
 
 export function useAccountsPayable() {
@@ -29,10 +30,10 @@ export function useAccountsPayable() {
 
       if (error) throw error;
       setAccounts(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Erro ao carregar contas',
-        description: error.message,
+        description: getErrorMessage(error),
         variant: 'destructive',
       });
     } finally {
@@ -52,7 +53,7 @@ export function useAccountsPayable() {
 
       if (error) throw error;
       setCategories(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao carregar categorias:', error);
     }
   };
@@ -76,10 +77,10 @@ export function useAccountsPayable() {
       setAccounts([...accounts, data]);
       toast({ title: 'Conta adicionada com sucesso!' });
       return data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Erro ao adicionar conta',
-        description: error.message,
+        description: getErrorMessage(error),
         variant: 'destructive',
       });
       throw error;
@@ -100,10 +101,10 @@ export function useAccountsPayable() {
       setAccounts(accounts.map(a => a.id === id ? data : a));
       toast({ title: 'Conta atualizada!' });
       return data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Erro ao atualizar conta',
-        description: error.message,
+        description: getErrorMessage(error),
         variant: 'destructive',
       });
       throw error;
@@ -129,10 +130,10 @@ export function useAccountsPayable() {
 
       setAccounts(accounts.filter(a => a.id !== id));
       toast({ title: 'Conta removida!' });
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Erro ao remover conta',
-        description: error.message,
+        description: getErrorMessage(error),
         variant: 'destructive',
       });
       throw error;
@@ -158,10 +159,10 @@ export function useAccountsPayable() {
       setCategories([...categories, data]);
       toast({ title: 'Categoria adicionada!' });
       return data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Erro ao adicionar categoria',
-        description: error.message,
+        description: getErrorMessage(error),
         variant: 'destructive',
       });
       throw error;

@@ -5,18 +5,20 @@ import { toast } from './use-toast';
 
 export function useRealtimeSync() {
   const {
-    setIngredients, setSales, setProducts, setTables,
-    ingredients, sales, products, tables
+    setIngredients, setSales, setProducts, setTables, setOrders,
+    ingredients, sales, products, tables, orders
   } = useStore();
   const ingredientsRef = useRef(ingredients);
   const salesRef = useRef(sales);
   const productsRef = useRef(products);
   const tablesRef = useRef(tables);
+  const ordersRef = useRef(orders);
 
   ingredientsRef.current = ingredients;
   salesRef.current = sales;
   productsRef.current = products;
   tablesRef.current = tables;
+  ordersRef.current = orders;
 
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
@@ -133,8 +135,71 @@ export function useRealtimeSync() {
       .subscribe();
     channels.push(productsChannel);
 
+    // Mesas
+    const tablesChannel = supabase
+      .channel('tables-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'tables' },
+        (payload) => {
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const newTable = {
+              id: payload.new.id,
+              number: payload.new.number,
+              name: payload.new.name,
+              customer_name: payload.new.customer_name,
+              status: payload.new.status,
+              currentOrderId: payload.new.current_order_id,
+              opened_at: payload.new.opened_at ? new Date(payload.new.opened_at) : undefined,
+              closed_at: payload.new.closed_at ? new Date(payload.new.closed_at) : undefined,
+            };
+            const current = tablesRef.current;
+            setTables(
+              current.some(t => t.id === newTable.id)
+                ? current.map(t => t.id === newTable.id ? newTable : t)
+                : [...current, newTable]
+            );
+          } else if (payload.eventType === 'DELETE') {
+            setTables(tablesRef.current.filter(t => t.id !== payload.old.id));
+          }
+        }
+      )
+      .subscribe();
+    channels.push(tablesChannel);
+
+    // Orders
+    const ordersChannel = supabase
+      .channel('orders-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'orders' },
+        (payload) => {
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const newOrder = {
+              id: payload.new.id,
+              tableId: payload.new.table_id,
+              items: payload.new.items,
+              status: payload.new.status,
+              total: payload.new.total,
+              paymentMethod: payload.new.payment_method,
+              createdAt: new Date(payload.new.created_at),
+            };
+            const current = ordersRef.current;
+            setOrders(
+              current.some(o => o.id === newOrder.id)
+                ? current.map(o => o.id === newOrder.id ? newOrder : o)
+                : [...current, newOrder]
+            );
+          } else if (payload.eventType === 'DELETE') {
+            setOrders(ordersRef.current.filter(o => o.id !== payload.old.id));
+          }
+        }
+      )
+      .subscribe();
+    channels.push(ordersChannel);
+
     return () => {
       channels.forEach(ch => supabase.removeChannel(ch));
     };
-  }, [setIngredients, setSales, setProducts]);
+  }, [setIngredients, setSales, setProducts, setTables, setOrders]);
 }

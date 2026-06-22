@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
+import { getErrorMessage } from '@/lib/utils';
 import { useBusiness } from '@/contexts/BusinessContext';
 
 interface CustomerModalProps {
@@ -55,10 +56,10 @@ export default function CustomerModal({ open, onOpenChange, onSuccess }: Custome
       setFormData({ name: '', phone: '', email: '', birth_date: '', address: '', notes: '', gender: '' });
       onOpenChange(false);
       onSuccess();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({ 
         title: 'Erro ao cadastrar cliente', 
-        description: error.message,
+        description: getErrorMessage(error),
         variant: 'destructive' 
       });
     } finally {

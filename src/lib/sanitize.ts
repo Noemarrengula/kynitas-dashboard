@@ -152,6 +152,42 @@ export function sanitizeCustomerData(data: any) {
 /**
  * Previne SQL Injection em strings de busca
  */
+/**
+ * Valida e sanitiza dados de ingrediente
+ */
+export function sanitizeIngredientData(data: any) {
+  return {
+    name: sanitizeText(data.name),
+    stock: sanitizeNumber(data.stock),
+    unit: sanitizeText(data.unit),
+    minStock: sanitizeNumber(data.minStock),
+    costPerUnit: sanitizeNumber(data.costPerUnit),
+    packages: Array.isArray(data.packages) ? data.packages.map((p: any) => ({
+      id: p.id,
+      name: sanitizeText(p.name),
+      quantity: sanitizeNumber(p.quantity),
+      costPerPackage: sanitizeNumber(p.costPerPackage),
+    })) : data.packages,
+  };
+}
+
+/**
+ * Valida e sanitiza dados de fornecedor
+ */
+export function sanitizeSupplierData(data: any) {
+  return {
+    name: sanitizeText(data.name),
+    contact_person: sanitizeText(data.contact_person),
+    email: sanitizeEmail(data.email),
+    phone: sanitizePhone(data.phone),
+    address: sanitizeText(data.address),
+    nuit: sanitizeText(data.nuit),
+    notes: sanitizeText(data.notes),
+    payment_terms: sanitizeNumber(data.payment_terms),
+    credit_limit: sanitizeNumber(data.credit_limit),
+  };
+}
+
 export function sanitizeSearchQuery(query: string | null | undefined): string {
   if (!query) return '';
   

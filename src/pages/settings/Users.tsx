@@ -12,6 +12,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
+import { getErrorMessage } from '@/lib/utils';
 import { usePermissions, ROLE_LABELS } from '@/hooks/usePermissions';
 import { useBusiness } from '@/contexts/BusinessContext';
 import {
@@ -40,10 +41,10 @@ export default function UsersPage() {
       setLoading(true);
       const data = await listBusinessUsers();
       setUsers(data);
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast({
         title: 'Erro ao carregar utilizadores',
-        description: err.message,
+        description: getErrorMessage(err),
         variant: 'destructive',
       });
     } finally {
@@ -64,10 +65,10 @@ export default function UsersPage() {
       setDialogOpen(false);
       setFormData({ email: '', password: '', name: '', businessId: currentBusiness?.id || '', role: 'manager' });
       loadUsers();
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast({
         title: 'Erro ao criar utilizador',
-        description: err.message,
+        description: getErrorMessage(err),
         variant: 'destructive',
       });
     }
@@ -78,10 +79,10 @@ export default function UsersPage() {
       await deactivateBusinessUser(userId, businessId);
       toast({ title: 'Utilizador desativado' });
       loadUsers();
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast({
         title: 'Erro',
-        description: err.message,
+        description: getErrorMessage(err),
         variant: 'destructive',
       });
     }

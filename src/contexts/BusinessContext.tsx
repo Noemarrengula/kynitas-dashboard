@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from './AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { getErrorMessage } from '@/lib/utils';
 import type { BusinessRole, BusinessUser } from '@/types/domains/user';
 
 interface Business {
@@ -80,10 +81,10 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
 
         localStorage.setItem('currentBusinessId', business.id);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro ao carregar negócios",
-        description: error.message,
+        description: getErrorMessage(error),
         variant: "destructive",
       });
     } finally {

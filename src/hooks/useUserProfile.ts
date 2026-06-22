@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/hooks/use-toast';
+import { getErrorMessage } from '@/lib/utils';
 
 export interface UserProfile {
   id: string;
@@ -95,11 +96,11 @@ export function useUserProfile() {
       setProfile({ ...profile, ...updates });
       toast({ title: 'Perfil atualizado com sucesso!' });
       return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao atualizar perfil:', error);
       toast({
         title: 'Erro ao atualizar perfil',
-        description: error.message || 'Verifique o console para mais detalhes',
+        description: getErrorMessage(error, 'Verifique o console para mais detalhes'),
         variant: 'destructive',
       });
       return false;

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, Plus, Search, Gift, Phone, Mail, Calendar, TrendingUp } from 'lucide-react';
+import { Users, Plus, Search, Gift, Phone, Mail, Calendar, TrendingUp, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -66,6 +66,14 @@ export default function Customers() {
   const totalCustomers = customers.length;
   const totalPoints = customers.reduce((acc, c) => acc + c.loyalty_points, 0);
   const totalRevenue = customers.reduce((acc, c) => acc + c.total_spent, 0);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

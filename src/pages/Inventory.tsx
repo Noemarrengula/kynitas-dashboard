@@ -11,6 +11,7 @@ import { useDatabase } from '@/hooks/useDatabase';
 import { toast } from '@/hooks/use-toast';
 import { formatCurrency, cn } from '@/lib/utils';
 import { exportInventoryToPDF, exportInventoryToExcel } from '@/lib/pdfExport';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 export default function Inventory() {
   const { ingredients, updateIngredient, addIngredient, loading } = useDatabase();
@@ -20,6 +21,9 @@ export default function Inventory() {
   const [selectedIngredientId, setSelectedIngredientId] = useState<string | null>(null);
   const [adjustmentQuantity, setAdjustmentQuantity] = useState('');
   const [selectedPackage, setSelectedPackage] = useState<string>('');
+  const [deductDialogOpen, setDeductDialogOpen] = useState(false);
+  const [deductIngredientId, setDeductIngredientId] = useState<string | null>(null);
+  const [deductQuantity, setDeductQuantity] = useState('');
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [newIngredient, setNewIngredient] = useState({
     name: '',
@@ -72,6 +76,36 @@ export default function Inventory() {
     setAdjustmentQuantity('');
     setSelectedPackage('');
     setAdjustDialogOpen(true);
+  };
+
+  const openDeductDialog = (ingredientId: string) => {
+    setDeductIngredientId(ingredientId);
+    setDeductQuantity('');
+    setDeductDialogOpen(true);
+  };
+
+  const handleDeduction = () => {
+    const amount = parseFloat(deductQuantity);
+    if (!deductIngredientId || isNaN(amount) || amount <= 0) {
+      toast({ title: 'Quantidade inválida', variant: 'destructive' });
+      return;
+    }
+
+    const ingredient = ingredients.find(i => i.id === deductIngredientId);
+    if (!ingredient) return;
+
+    const newStock = Math.max(0, ingredient.stock - amount);
+    updateIngredient(deductIngredientId, { stock: newStock });
+    addStockMovement({
+      id: `mov-${Date.now()}`,
+      ingredientId: deductIngredientId,
+      type: 'exit',
+      quantity: amount,
+      reason: 'Ajuste manual - Falha/Quebra',
+      createdAt: new Date(),
+    });
+    toast({ title: 'Stock reduzido', description: `${ingredient.name}: -${amount} ${ingredient.unit}` });
+    setDeductDialogOpen(false);
   };
 
   const handleCreateIngredient = () => {
@@ -188,6 +222,18 @@ export default function Inventory() {
         </div>
       </div>
 
+      {/* Loading */}
+      {loading ? (
+        <LoadingSpinner size="lg" text="Carregando ingredientes..." className="py-20" />
+      ) : ingredients.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground">
+          <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
+          <p className="text-lg font-medium">Nenhum ingrediente cadastrado</p>
+          <p className="text-sm mt-1">Clique em "Novo Ingrediente" para começar</p>
+        </div>
+      ) : (
+        <>
+
       {/* Alert */}
       {criticalIngredients.length > 0 && (
         <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 flex items-center gap-3">
@@ -244,22 +290,7 @@ export default function Inventory() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => {
-                      const qty = prompt(`Reduzir quantas ${ingredient.unit}?`);
-                      if (qty && parseFloat(qty) > 0) {
-                        const amount = parseFloat(qty);
-                        updateIngredient(ingredient.id, { stock: Math.max(0, ingredient.stock - amount) });
-                        addStockMovement({
-                          id: `mov-${Date.now()}`,
-                          ingredientId: ingredient.id,
-                          type: 'exit',
-                          quantity: amount,
-                          reason: 'Ajuste manual - Falha/Quebra',
-                          createdAt: new Date(),
-                        });
-                        toast({ title: 'Stock reduzido', description: `${ingredient.name}: -${amount} ${ingredient.unit}` });
-                      }
-                    }}
+                    onClick={() => openDeductDialog(ingredient.id)}
                   >
                     <Minus className="h-4 w-4" />
                   </Button>
@@ -307,6 +338,9 @@ export default function Inventory() {
           );
         })}
       </div>
+
+      </>
+      )}
 
       {/* Adjustment Dialog */}
       <Dialog open={adjustDialogOpen} onOpenChange={setAdjustDialogOpen}>
@@ -467,6 +501,57 @@ export default function Inventory() {
             </Button>
             <Button onClick={handleCreateIngredient}>
               Criar Ingrediente
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Deduct Dialog */}
+      <Dialog open={deductDialogOpen} onOpenChange={setDeductDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reduzir Stock</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {deductIngredientId && (
+              <div className="bg-muted p-3 rounded-lg">
+                <p className="text-sm text-muted-foreground">Ingrediente</p>
+                <p className="font-semibold">
+                  {ingredients.find(i => i.id === deductIngredientId)?.name}
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label>Quantidade a reduzir ({ingredients.find(i => i.id === deductIngredientId)?.unit})</Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.1"
+                placeholder="0"
+                value={deductQuantity}
+                onChange={(e) => setDeductQuantity(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleDeduction(); }}
+              />
+            </div>
+
+            {deductIngredientId && parseFloat(deductQuantity) > 0 && (
+              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
+                <p className="text-sm text-muted-foreground">Novo stock após redução:</p>
+                <p className="font-semibold">
+                  {Math.max(0, (ingredients.find(i => i.id === deductIngredientId)?.stock || 0) - parseFloat(deductQuantity))} {ingredients.find(i => i.id === deductIngredientId)?.unit}
+                </p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeductDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleDeduction}>
+              Reduzir Stock
             </Button>
           </DialogFooter>
         </DialogContent>

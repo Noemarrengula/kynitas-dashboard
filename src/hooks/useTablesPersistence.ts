@@ -38,7 +38,7 @@ export function useTablesPersistence() {
       if (ordersRes.data) {
         useStore.getState().setOrders(ordersRes.data.map(dbOrderToOrder));
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Erro ao carregar mesas/orders:', err);
     } finally {
       loadingRef.current = false;
@@ -71,7 +71,7 @@ export function useTablesPersistence() {
         .from('tables')
         .insert({ id: table.id, ...dbData });
 
-      if (error && error.code === '23505') {
+      if (error && typeof error === 'object' && 'code' in error && (error as Record<string, unknown>).code === '23505') {
         await supabase
           .from('tables')
           .update({ ...dbData, updated_at: new Date().toISOString() })

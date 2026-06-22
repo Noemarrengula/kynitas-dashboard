@@ -7,14 +7,14 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { useStore } from '@/store/useStore';
 import { OrderItem, Product } from '@/types';
 import { toast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
+import { cn, getErrorMessage } from '@/lib/utils';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { sanitizeSaleData, sanitizeSearchQuery } from '@/lib/sanitize';
 import { useCashDrawer } from '@/hooks/useCashDrawer';
 import { useCredits } from '@/hooks/useCredits';
+import { printReceipt } from '@/lib/receipt';
 
 export default function Sales() {
   const { products, ingredients, addSale, loading } = useDatabase();
@@ -138,6 +138,26 @@ export default function Sales() {
       toast({
         title: 'Selecione uma quantidade',
         description: 'Adicione pelo menos 1 garrafa ou dose',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Stock validation
+    const existingBottleItem = orderItems.find(
+      i => i.productId === fractionProduct.id && i.product?.name?.includes('(Garrafa)')
+    );
+    const existingShotItem = orderItems.find(
+      i => i.productId === fractionProduct.id && i.product?.name?.includes('(Dose)')
+    );
+    const existingBottles = existingBottleItem ? existingBottleItem.quantity : 0;
+    const existingShots = existingShotItem ? existingShotItem.quantity : 0;
+    const dosesPerBottle = fractionProduct.dosesPorGarrafa || 1;
+    const totalBottlesNeeded = existingBottles + bottleQty + Math.ceil((existingShots + shotQty) / dosesPerBottle);
+    if (totalBottlesNeeded > fractionProduct.stock) {
+      toast({
+        title: 'Stock insuficiente',
+        description: `Apenas ${fractionProduct.stock} ${fractionProduct.stock === 1 ? 'garrafa disponível' : 'garrafas disponíveis'}`,
         variant: 'destructive',
       });
       return;
@@ -309,8 +329,8 @@ export default function Sales() {
 
     // Imprimir recibos
     setTimeout(() => {
-      printReceipt(saleForPrint, 'client');
-      setTimeout(() => printReceipt(saleForPrint, 'merchant'), 500);
+      printReceipt(saleForPrint, 'client', business);
+      setTimeout(() => printReceipt(saleForPrint, 'merchant', business), 500);
     }, 300);
 
     if (lowStockItems.length > 0 || lowIngredients.length > 0) {
@@ -326,11 +346,11 @@ export default function Sales() {
       }, 1000);
     }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao processar pagamento:', error);
       toast({
         title: 'Erro ao processar venda',
-        description: error?.message || 'Tente novamente',
+        description: getErrorMessage(error, 'Tente novamente'),
         variant: 'destructive',
       });
     }
@@ -369,19 +389,19 @@ export default function Sales() {
       };
 
       setTimeout(() => {
-        printReceipt(creditForPrint, 'client');
-        setTimeout(() => printReceipt(creditForPrint, 'merchant'), 500);
+        printReceipt(creditForPrint, 'client', business);
+        setTimeout(() => printReceipt(creditForPrint, 'merchant', business), 500);
       }, 300);
 
       toast({
         title: 'Crédito registrado com sucesso!',
         description: `${customerName} levará ${orderItems.length} produto(s)`,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao registar crédito:', error);
       toast({
         title: 'Erro ao registar crédito',
-        description: error?.message || 'Tente novamente',
+        description: getErrorMessage(error, 'Tente novamente'),
       });
     }
   };
@@ -544,172 +564,6 @@ export default function Sales() {
           </style>
         </head>
         <body><pre><strong>${bill.join('\n')}</strong></pre></body>
-      </html>`;
-  };
-
-  const printReceipt = (sale: any, copyType: 'client' | 'merchant') => {
-    try {
-      console.log(`Imprimindo recibo (${copyType})...`, sale);
-      const iframe = document.createElement('iframe');
-      iframe.style.position = 'absolute';
-      iframe.style.width = '0';
-      iframe.style.height = '0';
-      iframe.style.border = 'none';
-      document.body.appendChild(iframe);
-      
-      const doc = iframe.contentWindow?.document;
-      if (!doc) return;
-      
-      doc.open();
-      doc.write(generateReceiptHTML(sale, copyType));
-      doc.close();
-      
-      setTimeout(() => {
-        iframe.contentWindow?.focus();
-        iframe.contentWindow?.print();
-        setTimeout(() => {
-          if (document.body.contains(iframe)) {
-            document.body.removeChild(iframe);
-          }
-        }, 1000);
-      }, 100);
-    } catch (error) {
-      console.error('Erro ao imprimir:', error);
-    }
-  };
-
-  const generateReceiptHTML = (sale: any, copyType: 'client' | 'merchant') => {
-    const formatCurrency = (value: number) => `${value.toFixed(2)} MT`;
-    const centerText = (text: string, width = 48) => {
-      const padding = Math.max(0, Math.floor((width - text.length) / 2));
-      return ' '.repeat(padding) + text;
-    };
-    const line = (char: string, width = 48) => char.repeat(width);
-    const formatLine = (left: string, right: string, width = 48) => {
-      const spaces = width - left.length - right.length;
-      return left + ' '.repeat(Math.max(1, spaces)) + right;
-    };
-
-    const receipt = [];
-    receipt.push(centerText(business?.name || 'KYNITAS BAR'));
-    receipt.push(centerText('Bar & Restaurante'));
-    if (business?.address) receipt.push(centerText(business.address));
-    if (business?.phone) receipt.push(centerText('Tel: ' + business.phone));
-    if (business?.nuit) receipt.push(centerText('NUIT: ' + business.nuit));
-    receipt.push('');
-    receipt.push(line('='));
-    receipt.push('');
-    receipt.push('Data: ' + new Date(sale.createdAt).toLocaleString('pt-MZ'));
-    receipt.push('Venda: #' + (sale.sale_number || sale.id.slice(0, 8).toUpperCase()));
-    receipt.push('');
-    receipt.push(line('-'));
-    receipt.push('');
-    receipt.push('ITENS:');
-    receipt.push('');
-    
-    sale.items.forEach((item: any) => {
-      receipt.push(item.product?.name ?? 'Produto');
-      receipt.push(formatLine(`  ${item.quantity}x ${formatCurrency(item.product?.price ?? 0)}`, formatCurrency(item.subtotal)));
-    });
-    
-    receipt.push('');
-    receipt.push(line('-'));
-    receipt.push('');
-    receipt.push(formatLine('TOTAL:', formatCurrency(sale.total)));
-    receipt.push('');
-    receipt.push(line('-'));
-    receipt.push('');
-    receipt.push('PAGAMENTO:');
-    receipt.push('');
-    
-    if (sale.paymentDetails.cash > 0) {
-      receipt.push(formatLine('  Numerario:', formatCurrency(sale.paymentDetails.cash)));
-    }
-    if (sale.paymentDetails.mpesa > 0) {
-      receipt.push(formatLine('  M-Pesa:', formatCurrency(sale.paymentDetails.mpesa)));
-    }
-    if (sale.paymentDetails.emola > 0) {
-      receipt.push(formatLine('  E-Mola:', formatCurrency(sale.paymentDetails.emola)));
-    }
-    if (sale.paymentDetails.card > 0) {
-      receipt.push(formatLine('  Cartao:', formatCurrency(sale.paymentDetails.card)));
-    }
-    
-    receipt.push('');
-    receipt.push(formatLine('Total Recebido:', formatCurrency(sale.paymentDetails.total)));
-    
-    if (sale.paymentDetails.change > 0) {
-      receipt.push(formatLine('Troco:', formatCurrency(sale.paymentDetails.change)));
-    }
-    
-    receipt.push('');
-    receipt.push(line('='));
-    receipt.push('');
-    receipt.push(centerText(copyType === 'client' ? '*** COPIA DO CLIENTE ***' : '*** COPIA DO COMERCIANTE ***'));
-    receipt.push('');
-    receipt.push(centerText('Obrigado pela preferencia!'));
-    receipt.push(centerText('Volte sempre!'));
-    receipt.push('');
-    receipt.push(centerText('Documento nao serve como fatura'));
-
-    return `<!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="UTF-8">
-          <title>Recibo</title>
-          <style>
-            @page { 
-              size: 80mm auto; 
-              margin: 0;
-            }
-            * {
-              margin: 0;
-              padding: 0;
-              box-sizing: border-box;
-              -webkit-print-color-adjust: exact !important;
-              print-color-adjust: exact !important;
-              color-adjust: exact !important;
-            }
-            body { 
-              font-family: 'Courier New', Courier, monospace;
-              font-size: 13px;
-              line-height: 1.4;
-              width: 80mm;
-              margin: 0;
-              padding: 5mm;
-              background: #fff;
-              color: #000;
-              font-weight: bold;
-            }
-            pre, strong { 
-              margin: 0;
-              padding: 0;
-              white-space: pre;
-              font-family: inherit;
-              font-size: inherit;
-              color: #000;
-              font-weight: bold;
-            }
-            @media print {
-              * {
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-                color-adjust: exact !important;
-              }
-              body { 
-                padding: 2mm;
-                background: #fff !important;
-                color: #000 !important;
-                font-weight: bold !important;
-              }
-              pre, strong {
-                color: #000 !important;
-                font-weight: bold !important;
-              }
-            }
-          </style>
-        </head>
-        <body><pre><strong>${receipt.join('\n')}</strong></pre></body>
       </html>`;
   };
 
@@ -885,7 +739,7 @@ export default function Sales() {
       />
 
       {/* Fraction Dialog (Garrafa/Dose) */}
-      <Dialog open={showFractionDialog} onOpenChange={setShowFractionDialog}>
+      <Dialog open={showFractionDialog} onOpenChange={(open) => { if (!open) { setFractionProduct(null); setBottleQty(0); setShotQty(0); } setShowFractionDialog(open); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{fractionProduct?.name}</DialogTitle>

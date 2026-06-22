@@ -1,7 +1,7 @@
 import { Download, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, getErrorMessage } from '@/lib/utils';
 import { exportDREToPDF } from '@/lib/pdfExport';
 import { exportToExcel } from '@/lib/export';
 import { format } from 'date-fns';
@@ -50,8 +50,8 @@ export function DRETab() {
     try {
       exportDREToPDF(dreData, `dre-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
       toast({ title: 'DRE PDF exportado!' });
-    } catch (e: any) {
-      toast({ title: 'Erro ao exportar DRE', description: e?.message || 'Erro desconhecido', variant: 'destructive' });
+    } catch (e: unknown) {
+      toast({ title: 'Erro ao exportar DRE', description: getErrorMessage(e), variant: 'destructive' });
     }
   };
 
@@ -66,8 +66,8 @@ export function DRETab() {
       ];
       exportToExcel(data, `dre-${format(new Date(), 'yyyy-MM-dd')}`);
       toast({ title: 'DRE Excel exportado!' });
-    } catch (e: any) {
-      toast({ title: 'Erro ao exportar DRE', description: e?.message || 'Erro desconhecido', variant: 'destructive' });
+    } catch (e: unknown) {
+      toast({ title: 'Erro ao exportar DRE', description: getErrorMessage(e), variant: 'destructive' });
     }
   };
 
