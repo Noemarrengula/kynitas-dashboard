@@ -120,8 +120,7 @@ export function useDatabase() {
         setLoading(true);
         setError(null);
 
-        try {
-          const [productsRes, ingredientsRes, salesRes, creditsRes] = await Promise.all([
+        const [productsRes, ingredientsRes, salesRes, creditsRes] = await Promise.all([
             supabase.from('products').select('*').eq('business_id', currentBusiness.id),
             supabase.from('ingredients').select('*').eq('business_id', currentBusiness.id),
             supabase.from('sales').select('*').eq('business_id', currentBusiness.id).order('created_at', { ascending: false }).limit(2000),
