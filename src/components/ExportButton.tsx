@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -16,7 +17,7 @@ interface ExportButtonProps {
   disabled?: boolean;
 }
 
-export function ExportButton({ data, filename, formatData, disabled }: ExportButtonProps) {
+const ExportButton = memo(function ExportButton({ data, filename, formatData, disabled }: ExportButtonProps) {
   const { toast } = useToast();
 
   const handleExport = (format: 'excel' | 'csv') => {
@@ -71,4 +72,6 @@ export function ExportButton({ data, filename, formatData, disabled }: ExportBut
       </DropdownMenuContent>
     </DropdownMenu>
   );
-}
+});
+
+export { ExportButton };

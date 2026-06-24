@@ -1,4 +1,5 @@
 import { Sale } from '@/types';
+import { memo } from 'react';
 import { formatCurrency } from '@/lib/utils';
 import { format } from 'date-fns';
 import { useBusiness } from '@/contexts/BusinessContext';
@@ -8,7 +9,7 @@ interface ReceiptPrintProps {
   copyType?: 'client' | 'merchant';
 }
 
-export function ReceiptPrint({ sale, copyType = 'client' }: ReceiptPrintProps) {
+const ReceiptPrint = memo(function ReceiptPrint({ sale, copyType = 'client' }: ReceiptPrintProps) {
   const { business } = useBusiness();
   const WIDTH = 48; // XPprinter Font A - 48 colunas (padrão)
 
@@ -140,4 +141,5 @@ export function ReceiptPrint({ sale, copyType = 'client' }: ReceiptPrintProps) {
       }}><strong>{lines.join('\n')}</strong></pre>
     </div>
   );
-}
+};
+export { ReceiptPrint };

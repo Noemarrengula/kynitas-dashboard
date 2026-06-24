@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, memo } from 'react';
 import { Users, Minus, X, Check, Settings2, PlusCircle, Receipt } from 'lucide-react';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { PaymentModal } from '@/components/sales/PaymentModal';
@@ -52,7 +52,7 @@ export default function Tables() {
   const [creditCustomerName, setCreditCustomerName] = useState('');
 
 
-  const handleTableClick = (table: Table, e: React.MouseEvent) => {
+  const handleTableClick = useCallback((table: Table, e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('.manage-btn')) return;
     setSelectedTable(table);
     
@@ -64,12 +64,12 @@ export default function Tables() {
     } else {
       setOrderItems([]);
     }
-  };
+  }, [orders]);
 
-  const handleManageTable = (table: Table) => {
+  const handleManageTable = useCallback((table: Table) => {
     setManagingTable(table);
     setShowManagementModal(true);
-  };
+  }, []);
 
   const handleSaveTableManagement = useCallback((data: { customer_name?: string; status: 'free' | 'occupied' | 'awaiting_payment' }) => {
     if (!managingTable) return;
@@ -494,59 +494,13 @@ export default function Tables() {
         {tables.map((table) => {
           const order = orders.find(o => o.id === table.currentOrderId);
           return (
-            <div key={table.id} className="relative">
-              <button
-                onClick={(e) => handleTableClick(table, e)}
-                className={cn(
-                  "w-full p-6 rounded-xl border-2 transition-all duration-200 hover:scale-105 hover:shadow-lg text-left",
-                  statusColors[table.status]
-                )}
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-2xl font-bold">{table.name || `Mesa ${table.number}`}</span>
-                  <div className={cn(
-                    "h-3 w-3 rounded-full",
-                    table.status === 'free' ? 'bg-success' :
-                    table.status === 'occupied' ? 'bg-primary' : 'bg-warning'
-                  )} />
-                </div>
-                <Badge variant="outline" className={statusColors[table.status]}>
-                  {statusLabels[table.status]}
-                </Badge>
-                {table.customer_name && (
-                  <p className="text-sm mt-2 font-medium truncate">
-                    {table.customer_name}
-                  </p>
-                )}
-                {order && (
-                  <>
-                    <div className="mt-3 space-y-1 border-t pt-2">
-                      <p className="text-xs font-semibold text-muted-foreground">Itens:</p>
-                      {order.items.slice(0, 3).map((item, idx) => (
-                        <p key={idx} className="text-xs truncate">
-                          {item.quantity}x {item.product?.name ?? 'Produto'}
-                        </p>
-                      ))}
-                      {order.items.length > 3 && (
-                        <p className="text-xs text-muted-foreground">+{order.items.length - 3} mais...</p>
-                      )}
-                    </div>
-                    <p className="text-sm mt-2 font-bold">
-                      {order.total.toLocaleString('pt-MZ')} MT
-                    </p>
-                  </>
-                )}
-              </button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="manage-btn absolute top-2 right-2"
-                onClick={() => handleManageTable(table)}
-                aria-label="Gerir mesa"
-              >
-                <Settings2 className="h-4 w-4" />
-              </Button>
-            </div>
+            <TableCard
+              key={table.id}
+              table={table}
+              order={order}
+              onTableClick={handleTableClick}
+              onManageTable={handleManageTable}
+            />
           );
         })}
         </div>
@@ -769,4 +723,72 @@ export default function Tables() {
       />
     </div>
   );
-}
+};
+
+const TableCard = memo(({
+  table,
+  order,
+  onTableClick,
+  onManageTable,
+}: {
+  table: Table;
+  order: Order | undefined;
+  onTableClick: (table: Table, e: React.MouseEvent) => void;
+  onManageTable: (table: Table) => void;
+}) => {
+  return (
+    <div className="relative">
+      <button
+        onClick={(e) => onTableClick(table, e)}
+        className={cn(
+          "w-full p-6 rounded-xl border-2 transition-all duration-200 hover:scale-105 hover:shadow-lg text-left",
+          statusColors[table.status]
+        )}
+      >
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-2xl font-bold">{table.name || `Mesa ${table.number}`}</span>
+          <div className={cn(
+            "h-3 w-3 rounded-full",
+            table.status === 'free' ? 'bg-success' :
+            table.status === 'occupied' ? 'bg-primary' : 'bg-warning'
+          )} />
+        </div>
+        <Badge variant="outline" className={statusColors[table.status]}>
+          {statusLabels[table.status]}
+        </Badge>
+        {table.customer_name && (
+          <p className="text-sm mt-2 font-medium truncate">
+            {table.customer_name}
+          </p>
+        )}
+        {order && (
+          <>
+            <div className="mt-3 space-y-1 border-t pt-2">
+              <p className="text-xs font-semibold text-muted-foreground">Itens:</p>
+              {order.items.slice(0, 3).map((item, idx) => (
+                <p key={idx} className="text-xs truncate">
+                  {item.quantity}x {item.product?.name ?? 'Produto'}
+                </p>
+              ))}
+              {order.items.length > 3 && (
+                <p className="text-xs text-muted-foreground">+{order.items.length - 3} mais...</p>
+              )}
+            </div>
+            <p className="text-sm mt-2 font-bold">
+              {order.total.toLocaleString('pt-MZ')} MT
+            </p>
+          </>
+        )}
+      </button>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        className="manage-btn absolute top-2 right-2"
+        onClick={() => onManageTable(table)}
+        aria-label="Gerir mesa"
+      >
+        <Settings2 className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+});

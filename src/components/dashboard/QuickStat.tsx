@@ -1,4 +1,5 @@
-﻿import { Card, CardContent } from '@/components/ui/card';
+﻿import { memo } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 
@@ -13,7 +14,7 @@ interface QuickStatProps {
   format?: 'currency' | 'number' | 'percentage';
 }
 
-export function QuickStat({ title, value, change, format = 'number' }: QuickStatProps) {
+const QuickStat = memo(function QuickStat({ title, value, change, format = 'number' }: QuickStatProps) {
   const formatValue = (val: string | number) => {
     if (format === 'currency') {
       return formatCurrency(Number(val));
@@ -66,4 +67,6 @@ export function QuickStat({ title, value, change, format = 'number' }: QuickStat
       </CardContent>
     </Card>
   );
-}
+});
+
+export { QuickStat };

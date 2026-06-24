@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,7 +15,7 @@ interface PaymentModalProps {
   customer: Customer | null;
 }
 
-export function PaymentModal({ open, onClose, onSave, customer }: PaymentModalProps) {
+const PaymentModal = memo(function PaymentModal({ open, onClose, onSave, customer }: PaymentModalProps) {
   const [amount, setAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [description, setDescription] = useState('');
@@ -144,4 +144,5 @@ export function PaymentModal({ open, onClose, onSave, customer }: PaymentModalPr
       </DialogContent>
     </Dialog>
   );
-}
+};
+export { PaymentModal };

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,7 +13,7 @@ interface TableManagementModalProps {
   onSave: (data: { customer_name?: string; status: 'free' | 'occupied' | 'awaiting_payment' }) => void;
 }
 
-export function TableManagementModal({ open, onClose, table, onSave }: TableManagementModalProps) {
+const TableManagementModal = memo(function TableManagementModal({ open, onClose, table, onSave }: TableManagementModalProps) {
   const [customerName, setCustomerName] = useState(table?.customer_name || '');
   const [status, setStatus] = useState<'free' | 'occupied' | 'awaiting_payment'>(table?.status || 'free');
 
@@ -71,4 +71,5 @@ export function TableManagementModal({ open, onClose, table, onSave }: TableMana
       </DialogContent>
     </Dialog>
   );
-}
+};
+export { TableManagementModal };

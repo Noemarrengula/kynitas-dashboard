@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+﻿import { useState, memo } from 'react';
 import { Calendar, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -54,7 +54,7 @@ const presetRanges: DateRange[] = [
   }
 ];
 
-export function DateFilter({ value, onChange }: DateFilterProps) {
+const DateFilter = memo(function DateFilter({ value, onChange }: DateFilterProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -77,4 +77,6 @@ export function DateFilter({ value, onChange }: DateFilterProps) {
       </DropdownMenuContent>
     </DropdownMenu>
   );
-}
+});
+
+export { DateFilter };

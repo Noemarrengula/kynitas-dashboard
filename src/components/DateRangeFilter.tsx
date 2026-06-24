@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -11,7 +12,7 @@ interface DateRangeFilterProps {
   onDateRangeChange: (range: DateRange | undefined) => void;
 }
 
-export function DateRangeFilter({ dateRange, onDateRangeChange }: DateRangeFilterProps) {
+const DateRangeFilter = memo(function DateRangeFilter({ dateRange, onDateRangeChange }: DateRangeFilterProps) {
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -44,4 +45,6 @@ export function DateRangeFilter({ dateRange, onDateRangeChange }: DateRangeFilte
       </PopoverContent>
     </Popover>
   );
-}
+});
+
+export { DateRangeFilter };

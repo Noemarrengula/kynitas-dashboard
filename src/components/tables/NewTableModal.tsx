@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,7 +11,7 @@ interface NewTableModalProps {
   existingNumbers: number[];
 }
 
-export function NewTableModal({ open, onClose, onSave, existingNumbers }: NewTableModalProps) {
+const NewTableModal = memo(function NewTableModal({ open, onClose, onSave, existingNumbers }: NewTableModalProps) {
   const nextNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) + 1 : 1;
   const [number, setNumber] = useState(nextNumber);
   const [name, setName] = useState('');
@@ -81,4 +81,5 @@ export function NewTableModal({ open, onClose, onSave, existingNumbers }: NewTab
       </DialogContent>
     </Dialog>
   );
-}
+};
+export { NewTableModal };

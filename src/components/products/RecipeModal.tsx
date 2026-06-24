@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,7 +15,7 @@ interface RecipeModalProps {
   onClose: () => void;
 }
 
-export function RecipeModal({ product, open, onClose }: RecipeModalProps) {
+const RecipeModal = memo(function RecipeModal({ product, open, onClose }: RecipeModalProps) {
   const { ingredients, updateProduct } = useStore();
   const [recipe, setRecipe] = useState<RecipeItem[]>(product?.recipe || []);
 
@@ -139,4 +139,5 @@ export function RecipeModal({ product, open, onClose }: RecipeModalProps) {
       </DialogContent>
     </Dialog>
   );
-}
+};
+export { RecipeModal };

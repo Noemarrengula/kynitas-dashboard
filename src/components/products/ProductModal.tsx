@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { X, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,7 +32,7 @@ interface ProductModalProps {
 const drinkCategories = ['Cervejas', 'Vinhos', 'Destilados', 'Cocktails', 'Não Alcoólicas', 'Cidras', 'Gins', 'Whiskys', 'Rum', 'Licores', 'Coolers', 'Energéticos', 'Refrigerantes', 'Sumos', 'Águas'];
 const mealCategories = ['Entradas', 'Frutos do Mar', 'Carnes', 'Tradicionais', 'Sobremesas'];
 
-export function ProductModal({ open, onClose, product, type }: ProductModalProps) {
+const ProductModal = memo(function ProductModal({ open, onClose, product, type }: ProductModalProps) {
   const { addProduct, updateProduct } = useDatabase();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -321,4 +321,5 @@ export function ProductModal({ open, onClose, product, type }: ProductModalProps
       </DialogContent>
     </Dialog>
   );
-}
+};
+export { ProductModal };

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,7 +14,7 @@ interface CustomerModalProps {
   customer?: Customer | null;
 }
 
-export function CustomerModal({ open, onClose, onSave, customer }: CustomerModalProps) {
+const CustomerModal = memo(function CustomerModal({ open, onClose, onSave, customer }: CustomerModalProps) {
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -173,4 +173,5 @@ export function CustomerModal({ open, onClose, onSave, customer }: CustomerModal
       </DialogContent>
     </Dialog>
   );
-}
+};
+export { CustomerModal };

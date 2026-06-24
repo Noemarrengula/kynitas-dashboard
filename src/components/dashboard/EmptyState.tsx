@@ -1,4 +1,5 @@
-﻿import { LucideIcon } from 'lucide-react';
+﻿import { memo } from 'react';
+import { LucideIcon } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 
 interface EmptyStateProps {
@@ -11,7 +12,7 @@ interface EmptyStateProps {
   };
 }
 
-export function EmptyState({ icon: Icon, title, description, action }: EmptyStateProps) {
+const EmptyState = memo(function EmptyState({ icon: Icon, title, description, action }: EmptyStateProps) {
   return (
     <Card>
       <CardContent className="flex flex-col items-center justify-center py-12 text-center">
@@ -31,4 +32,6 @@ export function EmptyState({ icon: Icon, title, description, action }: EmptyStat
       </CardContent>
     </Card>
   );
-}
+});
+
+export { EmptyState };

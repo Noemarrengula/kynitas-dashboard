@@ -8,7 +8,7 @@ import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { Banknote, CreditCard, Smartphone, ShoppingBag, Printer } from 'lucide-react';
 import { ReceiptPrint } from './ReceiptPrint';
-import { useRef } from 'react';
+import { useRef, memo } from 'react';
 import { generateReceipt, printToThermal } from '@/lib/thermalPrinter';
 import { toast } from '@/hooks/use-toast';
 
@@ -18,7 +18,7 @@ interface SaleDetailsModalProps {
   onClose: () => void;
 }
 
-export function SaleDetailsModal({ sale, open, onClose }: SaleDetailsModalProps) {
+const SaleDetailsModal = memo(function SaleDetailsModal({ sale, open, onClose }: SaleDetailsModalProps) {
   const printRef = useRef<HTMLDivElement>(null);
 
   if (!sale) {
@@ -208,4 +208,5 @@ export function SaleDetailsModal({ sale, open, onClose }: SaleDetailsModalProps)
       </DialogContent>
     </Dialog>
   );
-}
+};
+export { SaleDetailsModal };

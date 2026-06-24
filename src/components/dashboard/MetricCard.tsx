@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -25,7 +26,7 @@ const iconStyles = {
   destructive: 'bg-destructive/20 text-destructive',
 };
 
-export function MetricCard({ title, value, icon: Icon, trend, variant = 'default' }: MetricCardProps) {
+const MetricCard = memo(function MetricCard({ title, value, icon: Icon, trend, variant = 'default' }: MetricCardProps) {
   return (
     <div className={cn(
       "rounded-xl p-5 border transition-all duration-200 hover:shadow-lg animate-slide-up",
@@ -61,4 +62,6 @@ export function MetricCard({ title, value, icon: Icon, trend, variant = 'default
       </div>
     </div>
   );
-}
+});
+
+export { MetricCard };

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, memo } from 'react';
 import { ShoppingCart, Plus, Minus, X, Check, Receipt } from 'lucide-react';
 import { PaymentModal } from '@/components/sales/PaymentModal';
 import { useDatabase } from '@/hooks/useDatabase';
@@ -615,36 +615,7 @@ export default function Sales() {
           {/* Product Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {filteredProducts.map((product) => (
-              <button
-                key={product.id}
-                onClick={() => addItemToOrder(product)}
-                disabled={product.stock <= 0}
-                className="p-4 rounded-xl border hover:border-primary hover:shadow-md transition-all text-left group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-border"
-              >
-                {product.image ? (
-                  <img
-                    src={product.image}
-                    alt={product.name}
-                    className="h-20 w-full object-cover rounded-lg mb-3"
-                  />
-                ) : (
-                  <div className="h-20 w-full bg-muted rounded-lg mb-3 flex items-center justify-center">
-                    <ShoppingCart className="h-8 w-8 text-muted-foreground" />
-                  </div>
-                )}
-                <p className="font-medium text-sm truncate">{product.name}</p>
-                <div className="flex items-center justify-between mt-1">
-                  <span className="text-sm text-primary font-semibold">
-                    {product.price.toLocaleString('pt-MZ')} MT
-                  </span>
-                  <Badge 
-                    variant={product.stock <= 0 ? 'destructive' : product.stock <= 5 ? 'outline' : 'secondary'} 
-                    className="text-[10px]"
-                  >
-                    {product.stock <= 0 ? 'Esgotado' : product.stock}
-                  </Badge>
-                </div>
-              </button>
+              <ProductButton key={product.id} product={product} onAdd={addItemToOrder} />
             ))}
           </div>
         </div>
@@ -660,42 +631,12 @@ export default function Sales() {
           ) : (
             <div className="space-y-3 max-h-[300px] overflow-y-auto mb-4">
               {orderItems.map((item) => (
-                <div key={item.productId} className="flex items-center justify-between p-2 bg-muted rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => removeItem(item.productId)}
-                      className="text-destructive hover:bg-destructive/10 p-1 rounded"
-                      aria-label="Remover item"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                    <div className="min-w-0">
-                      <p className="font-medium text-sm truncate">{item.product?.name ?? 'Produto'}</p>
-                      <p className="text-xs text-muted-foreground">{item.product?.price ?? 0} MT</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="outline"
-                      size="icon-sm"
-                      onClick={() => updateItemQuantity(item.productId, -1)}
-                      className="h-6 w-6"
-                      aria-label="Diminuir quantidade"
-                    >
-                      <Minus className="h-3 w-3" />
-                    </Button>
-                    <span className="w-6 text-center text-sm font-medium">{item.quantity}</span>
-                    <Button
-                      variant="outline"
-                      size="icon-sm"
-                      onClick={() => updateItemQuantity(item.productId, 1)}
-                      className="h-6 w-6"
-                      aria-label="Aumentar quantidade"
-                    >
-                      <Plus className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
+                <OrderItemRow
+                  key={item.productId}
+                  item={item}
+                  onUpdateQuantity={updateItemQuantity}
+                  onRemove={removeItem}
+                />
               ))}
             </div>
           )}
@@ -874,3 +815,88 @@ export default function Sales() {
     </div>
   );
 }
+
+const ProductButton = memo(({
+  product,
+  onAdd,
+}: {
+  product: Product;
+  onAdd: (product: Product) => void;
+}) => (
+  <button
+    onClick={() => onAdd(product)}
+    disabled={product.stock <= 0}
+    className="p-4 rounded-xl border hover:border-primary hover:shadow-md transition-all text-left group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-border"
+  >
+    {product.image ? (
+      <img
+        src={product.image}
+        alt={product.name}
+        className="h-20 w-full object-cover rounded-lg mb-3"
+      />
+    ) : (
+      <div className="h-20 w-full bg-muted rounded-lg mb-3 flex items-center justify-center">
+        <ShoppingCart className="h-8 w-8 text-muted-foreground" />
+      </div>
+    )}
+    <p className="font-medium text-sm truncate">{product.name}</p>
+    <div className="flex items-center justify-between mt-1">
+      <span className="text-sm text-primary font-semibold">
+        {product.price.toLocaleString('pt-MZ')} MT
+      </span>
+      <Badge
+        variant={product.stock <= 0 ? 'destructive' : product.stock <= 5 ? 'outline' : 'secondary'}
+        className="text-[10px]"
+      >
+        {product.stock <= 0 ? 'Esgotado' : product.stock}
+      </Badge>
+    </div>
+  </button>
+));
+
+const OrderItemRow = memo(({
+  item,
+  onUpdateQuantity,
+  onRemove,
+}: {
+  item: OrderItem;
+  onUpdateQuantity: (productId: string, delta: number) => void;
+  onRemove: (productId: string) => void;
+}) => (
+  <div className="flex items-center justify-between p-2 bg-muted rounded-lg">
+    <div className="flex items-center gap-2">
+      <button
+        onClick={() => onRemove(item.productId)}
+        className="text-destructive hover:bg-destructive/10 p-1 rounded"
+        aria-label="Remover item"
+      >
+        <X className="h-4 w-4" />
+      </button>
+      <div className="min-w-0">
+        <p className="font-medium text-sm truncate">{item.product?.name ?? 'Produto'}</p>
+        <p className="text-xs text-muted-foreground">{item.product?.price ?? 0} MT</p>
+      </div>
+    </div>
+    <div className="flex items-center gap-1">
+      <Button
+        variant="outline"
+        size="icon-sm"
+        onClick={() => onUpdateQuantity(item.productId, -1)}
+        className="h-6 w-6"
+        aria-label="Diminuir quantidade"
+      >
+        <Minus className="h-3 w-3" />
+      </Button>
+      <span className="w-6 text-center text-sm font-medium">{item.quantity}</span>
+      <Button
+        variant="outline"
+        size="icon-sm"
+        onClick={() => onUpdateQuantity(item.productId, 1)}
+        className="h-6 w-6"
+        aria-label="Aumentar quantidade"
+      >
+        <Plus className="h-3 w-3" />
+      </Button>
+    </div>
+  </div>
+));
