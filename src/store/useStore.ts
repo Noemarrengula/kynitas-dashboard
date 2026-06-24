@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Product, Table, Order, Sale, StockMovement, User, Ingredient } from '@/types';
+import { Product, Table, Order, Sale, StockMovement, User, Ingredient, Credit } from '@/types';
 
 interface AppState {
   // User
@@ -32,6 +32,10 @@ interface AppState {
   addOrder: (order: Order) => void;
   updateOrder: (id: string, order: Partial<Order>) => void;
   
+  // Credits
+  credits: Credit[];
+  setCredits: (credits: Credit[]) => void;
+
   // Sales
   sales: Sale[];
   setSales: (sales: Sale[]) => void;
@@ -79,6 +83,9 @@ export const useStore = create<AppState>((set) => ({
     orders: state.orders.map((o) => o.id === id ? { ...o, ...updatedOrder } : o),
   })),
   
+  credits: [],
+  setCredits: (credits) => set({ credits }),
+
   // Sales
   sales: [],
   setSales: (sales) => set({ sales }),

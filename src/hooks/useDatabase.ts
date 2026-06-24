@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useToast } from '@/hooks/use-toast';
+import { useStore } from '@/store/useStore';
 import { Product, Ingredient, Sale, Credit } from '@/types';
 
 interface DatabaseError {
@@ -133,8 +134,16 @@ export function useDatabase() {
           const creditsData = creditsRes.data;
 
         // Atualizar estado com dados carregados
-        if (productsData) setProducts(productsData.map(p => toCamelCase(p) as Product));
-        if (ingredientsData) setIngredients(ingredientsData.map(i => toCamelCase(i) as Ingredient));
+        if (productsData) {
+          const p = productsData.map(p => toCamelCase(p) as Product);
+          setProducts(p);
+          useStore.getState().setProducts(p);
+        }
+        if (ingredientsData) {
+          const i = ingredientsData.map(i => toCamelCase(i) as Ingredient);
+          setIngredients(i);
+          useStore.getState().setIngredients(i);
+        }
         
         // Transformar dados do Supabase para o formato esperado
         if (salesData) {
@@ -146,7 +155,9 @@ export function useDatabase() {
               createdAt: sale.created_at,
             } as unknown as Sale;
           });
-          setSales(transformedSales);
+        setSales(transformedSales);
+        useStore.getState().setSales(transformedSales);
+          useStore.getState().setSales(transformedSales);
         }
 
         // Transformar créditos
@@ -167,11 +178,27 @@ export function useDatabase() {
             saleId: credit.sale_id
           }));
           setCredits(transformedCredits);
+          useStore.getState().setCredits(transformedCredits);
         }
 
         // Se chegou aqui, funcionou
         setLoading(false);
         setRetryCount(0);
+
+        // Sincronizar com Zustand (useStore) para unificar fonte de verdade
+        if (productsData) useStore.getState().setProducts(productsData.map(p => toCamelCase(p) as Product));
+        if (ingredientsData) useStore.getState().setIngredients(ingredientsData.map(i => toCamelCase(i) as Ingredient));
+        if (salesData) {
+          const transformedSales = salesData.map(sale => {
+            const c = toCamelCase(sale);
+            return {
+              ...c,
+              paymentDetails: sale.payment_details || {},
+              createdAt: sale.created_at,
+            } as unknown as Sale;
+          });
+          useStore.getState().setSales(transformedSales);
+        }
 
       } catch (err: unknown) {
         console.error(`Erro ao carregar dados (tentativa ${attempt + 1}/${maxRetries}):`, err);
@@ -210,6 +237,7 @@ export function useDatabase() {
 
       if (data) {
         setProducts([...products, toCamelCase(data) as Product]);
+        useStore.getState().addProduct(toCamelCase(data) as Product);
         toast({
           title: 'Produto criado',
           description: `${product.name} foi adicionado com sucesso`,
@@ -241,6 +269,7 @@ export function useDatabase() {
 
       if (data) {
         setProducts(products.map(p => p.id === id ? toCamelCase(data) as Product : p));
+        useStore.getState().updateProduct(id, toCamelCase(data) as Partial<Product>);
         toast({
           title: 'Produto atualizado',
           description: 'Alterações salvas com sucesso',
@@ -267,6 +296,7 @@ export function useDatabase() {
       if (error) throw error;
 
       setProducts(products.filter(p => p.id !== id));
+      useStore.getState().deleteProduct(id);
       toast({
         title: 'Produto removido',
         description: 'Produto foi deletado com sucesso',
@@ -294,6 +324,7 @@ export function useDatabase() {
 
       if (data) {
         setIngredients([...ingredients, toCamelCase(data) as Ingredient]);
+        useStore.getState().addIngredient(toCamelCase(data) as Ingredient);
         toast({
           title: 'Ingrediente criado',
           description: `${ingredient.name} foi adicionado com sucesso`,
@@ -323,6 +354,7 @@ export function useDatabase() {
 
       if (data) {
         setIngredients(ingredients.map(i => i.id === id ? toCamelCase(data) as Ingredient : i));
+        useStore.getState().updateIngredient(id, toCamelCase(data) as Partial<Ingredient>);
       }
       return { data, error: null };
     } catch (err: unknown) {
@@ -345,6 +377,7 @@ export function useDatabase() {
       if (error) throw error;
 
       setIngredients(ingredients.filter(i => i.id !== id));
+      useStore.getState().deleteIngredient(id);
       toast({
         title: 'Ingrediente removido',
       });
@@ -412,6 +445,7 @@ export function useDatabase() {
       };
       
       setSales([transformedSale, ...sales]);
+      useStore.getState().addSale(transformedSale);
       
       // Atualizar stock localmente
       const updatedProducts = products.map(product => {
@@ -431,6 +465,7 @@ export function useDatabase() {
         return { ...product, stock: Math.max(0, product.stock - totalDeduction) };
       });
       setProducts(updatedProducts);
+      useStore.getState().setProducts(updatedProducts);
 
       return { data: transformedSale, error: null };
     } catch (err: unknown) {
@@ -481,6 +516,7 @@ export function useDatabase() {
       };
 
       setCredits([transformedCredit, ...credits]);
+      useStore.getState().setCredits([transformedCredit, ...useStore.getState().credits]);
 
       toast({
         title: 'Crédito registrado',
@@ -566,6 +602,9 @@ export function useDatabase() {
 
       // Atualizar na lista local
       setCredits(credits.map(c => c.id === creditId ? transformedCredit : c));
+      useStore.getState().setCredits(
+        useStore.getState().credits.map(c => c.id === creditId ? transformedCredit : c)
+      );
 
       toast({
         title: 'Pagamento registrado',
@@ -607,6 +646,7 @@ export function useDatabase() {
       }));
 
       setCredits(transformedCredits);
+      useStore.getState().setCredits(transformedCredits);
     } catch (err: unknown) {
       handleError(err, 'LOAD_CREDITS');
     }
@@ -627,6 +667,7 @@ export function useDatabase() {
       if (error) throw error;
 
       setCredits(credits.filter(c => c.id !== id));
+      useStore.getState().setCredits(useStore.getState().credits.filter(c => c.id !== id));
 
       toast({
         title: 'Crédito removido',

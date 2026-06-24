@@ -16,13 +16,8 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recha
 import { startOfWeek, startOfMonth, endOfWeek, endOfMonth } from 'date-fns';
 
 export default function Dashboard() {
-  const { products: dbProducts, sales: dbSales, ingredients: dbIngredients, loading, loadAllSales } = useDatabase();
-  const { orders, products: storeProducts, sales: storeSales, ingredients: storeIngredients } = useStore();
-  
-  // Usar dados do banco de dados (Supabase) com fallback para store local
-  const products = dbProducts.length > 0 ? dbProducts : storeProducts;
-  const sales = dbSales.length > 0 ? dbSales : storeSales;
-  const ingredients = dbIngredients.length > 0 ? dbIngredients : storeIngredients;
+  const { loading, loadAllSales } = useDatabase();
+  const { orders, products, sales, ingredients } = useStore();
   
   const now = new Date();
   const weekStart = startOfWeek(now, { weekStartsOn: 1 });

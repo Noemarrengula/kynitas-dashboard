@@ -32,13 +32,9 @@ import { exportTopProductsToPDF, exportTopProductsToExcel, exportOutOfStockToPDF
 const COLORS = ['hsl(330, 100%, 50%)', 'hsl(330, 80%, 40%)', 'hsl(330, 60%, 60%)', 'hsl(330, 40%, 70%)'];
 
 export default function Reports() {
-  const { sales: dbSales, products: dbProducts, credits, loadAllSales } = useDatabase();
-  const { products: storeProducts } = useStore();
+  const { loading, loadAllSales } = useDatabase();
+  const { products, sales, credits } = useStore();
   const { business } = useBusiness();
-  
-  // Usar dados do banco de dados (Supabase) em vez do store local
-  const sales = dbSales;
-  const products = dbProducts.length > 0 ? dbProducts : storeProducts;
   const [period, setPeriod] = useState<'day' | 'week' | 'month'>('week');
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'cash' | 'mpesa' | 'emola' | 'card'>('all');
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
