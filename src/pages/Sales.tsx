@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { ShoppingCart, Plus, Minus, X, Check, Receipt } from 'lucide-react';
 import { PaymentModal } from '@/components/sales/PaymentModal';
 import { useDatabase } from '@/hooks/useDatabase';
@@ -96,7 +96,7 @@ export default function Sales() {
     }
   };
 
-  const addItemWithCustomPrice = () => {
+  const addItemWithCustomPrice = useCallback(() => {
     if (!selectedProduct) return;
     
     const price = parseFloat(customPrice);
@@ -129,9 +129,9 @@ export default function Sales() {
       title: 'Produto adicionado',
       description: `${selectedProduct.name} - ${price.toLocaleString('pt-MZ')} MT`,
     });
-  };
+  }, [selectedProduct, customPrice, orderItems]);
 
-  const addFractionItems = () => {
+  const addFractionItems = useCallback(() => {
     if (!fractionProduct) return;
 
     if (bottleQty <= 0 && shotQty <= 0) {
@@ -219,7 +219,7 @@ export default function Sales() {
     setFractionProduct(null);
     setBottleQty(0);
     setShotQty(0);
-  };
+  }, [fractionProduct, bottleQty, shotQty, orderItems]);
 
   const updateItemQuantity = (productId: string, delta: number) => {
     const item = orderItems.find(i => i.productId === productId);
@@ -254,7 +254,7 @@ export default function Sales() {
 
   const total = orderItems.reduce((acc, item) => acc + item.subtotal, 0);
 
-  const handlePaymentConfirm = async (payment: { cash: number; mpesa: number; emola: number; card: number }) => {
+  const handlePaymentConfirm = useCallback(async (payment: { cash: number; mpesa: number; emola: number; card: number }) => {
     try {
       const totalReceived = payment.cash + payment.mpesa + payment.emola + payment.card;
       const change = totalReceived - total;
@@ -354,9 +354,9 @@ export default function Sales() {
         variant: 'destructive',
       });
     }
-  };
+  }, [total, orderItems, products, ingredients, addSale, business, openCashDrawer]);
 
-  const handleCreditConfirm = async (customerName: string) => {
+  const handleCreditConfirm = useCallback(async (customerName: string) => {
     try {
       if (!customerName.trim()) {
         toast({
@@ -404,9 +404,9 @@ export default function Sales() {
         description: getErrorMessage(error, 'Tente novamente'),
       });
     }
-  };
+  }, [orderItems, total, registerCreditCharge, business]);
 
-  const printPreBill = () => {
+  const printPreBill = useCallback(() => {
     if (orderItems.length === 0) {
       toast({
         title: 'Carrinho vazio',
@@ -443,9 +443,9 @@ export default function Sales() {
     } catch (error) {
       console.error('Erro ao imprimir:', error);
     }
-  };
+  }, [orderItems, generatePreBillHTML]);
 
-  const generatePreBillHTML = () => {
+  const generatePreBillHTML = useCallback(() => {
     const formatCurrency = (value: number) => `${value.toFixed(2)} MT`;
     const centerText = (text: string, width = 48) => {
       const padding = Math.max(0, Math.floor((width - text.length) / 2));
@@ -565,7 +565,7 @@ export default function Sales() {
         </head>
         <body><pre><strong>${bill.join('\n')}</strong></pre></body>
       </html>`;
-  };
+  }, [business, orderItems, total]);
 
   return (
     <div className="space-y-6">

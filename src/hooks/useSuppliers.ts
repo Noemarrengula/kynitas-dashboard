@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { Supplier, PurchaseOrder } from '@/types';
@@ -21,13 +21,13 @@ export function useSuppliers() {
     }
   }, [currentBusiness?.id]);
 
-  const loadAll = async () => {
+  const loadAll = useCallback(async () => {
     setLoading(true);
     await Promise.all([fetchSuppliers(), fetchPurchaseOrders()]);
     setLoading(false);
-  };
+  }, [fetchSuppliers, fetchPurchaseOrders]);
 
-  const fetchSuppliers = async () => {
+  const fetchSuppliers = useCallback(async () => {
     if (!currentBusiness?.id) return;
 
     try {
@@ -43,9 +43,9 @@ export function useSuppliers() {
     } catch (err) {
       console.error('Erro ao buscar fornecedores:', err);
     }
-  };
+  }, [currentBusiness?.id]);
 
-  const fetchPurchaseOrders = async () => {
+  const fetchPurchaseOrders = useCallback(async () => {
     if (!currentBusiness?.id) return;
 
     try {
@@ -61,9 +61,9 @@ export function useSuppliers() {
     } catch (err) {
       console.error('Erro ao buscar ordens de compra:', err);
     }
-  };
+  }, [currentBusiness?.id]);
 
-  const addSupplier = async (supplier: Omit<Supplier, 'id' | 'business_id' | 'created_at' | 'updated_at'>): Promise<HookResult<Supplier>> => {
+  const addSupplier = useCallback(async (supplier: Omit<Supplier, 'id' | 'business_id' | 'created_at' | 'updated_at'>): Promise<HookResult<Supplier>> => {
     try {
       if (!currentBusiness?.id) return { data: null, error: new Error('Negócio não encontrado') };
 
@@ -86,9 +86,9 @@ export function useSuppliers() {
       console.error('Erro ao adicionar fornecedor:', err);
       return { data: null, error: err };
     }
-  };
+  }, [currentBusiness?.id, suppliers]);
 
-  const updateSupplier = async (id: string, updates: Partial<Supplier>): Promise<HookResult<null>> => {
+  const updateSupplier = useCallback(async (id: string, updates: Partial<Supplier>): Promise<HookResult<null>> => {
     try {
       if (!currentBusiness?.id) return { data: null, error: new Error('Negócio não encontrado') };
 
@@ -108,9 +108,9 @@ export function useSuppliers() {
       console.error('Erro ao atualizar fornecedor:', err);
       return { data: null, error: err };
     }
-  };
+  }, [currentBusiness?.id, suppliers]);
 
-  const deleteSupplier = async (id: string): Promise<HookResult<null>> => {
+  const deleteSupplier = useCallback(async (id: string): Promise<HookResult<null>> => {
     try {
       if (!currentBusiness?.id) return { data: null, error: new Error('Negócio não encontrado') };
 
@@ -128,9 +128,9 @@ export function useSuppliers() {
       console.error('Erro ao remover fornecedor:', err);
       return { data: null, error: err };
     }
-  };
+  }, [currentBusiness?.id, suppliers]);
 
-  const createPurchaseOrder = async (po: Omit<PurchaseOrder, 'id' | 'business_id' | 'order_number' | 'created_at' | 'updated_at'>): Promise<HookResult<PurchaseOrder>> => {
+  const createPurchaseOrder = useCallback(async (po: Omit<PurchaseOrder, 'id' | 'business_id' | 'order_number' | 'created_at' | 'updated_at'>): Promise<HookResult<PurchaseOrder>> => {
     try {
       if (!currentBusiness?.id) return { data: null, error: new Error('Negócio não encontrado') };
 
@@ -164,9 +164,9 @@ export function useSuppliers() {
       console.error('Erro ao criar ordem de compra:', err);
       return { data: null, error: err };
     }
-  };
+  }, [currentBusiness?.id, purchaseOrders]);
 
-  const updatePurchaseOrder = async (id: string, updates: Partial<PurchaseOrder>): Promise<HookResult<null>> => {
+  const updatePurchaseOrder = useCallback(async (id: string, updates: Partial<PurchaseOrder>): Promise<HookResult<null>> => {
     try {
       if (!currentBusiness?.id) return { data: null, error: new Error('Negócio não encontrado') };
 
@@ -184,9 +184,9 @@ export function useSuppliers() {
       console.error('Erro ao atualizar ordem de compra:', err);
       return { data: null, error: err };
     }
-  };
+  }, [currentBusiness?.id, purchaseOrders]);
 
-  const receivePurchaseOrder = async (poId: string, items: any[], invoiceNumber?: string) => {
+  const receivePurchaseOrder = useCallback(async (poId: string, items: any[], invoiceNumber?: string) => {
     try {
       if (!currentBusiness?.id) throw new Error('Negócio não encontrado');
 
@@ -249,7 +249,7 @@ export function useSuppliers() {
       console.error('Erro ao receber ordem de compra:', err);
       return null;
     }
-  };
+  }, [currentBusiness?.id, fetchPurchaseOrders]);
 
   return {
     suppliers,

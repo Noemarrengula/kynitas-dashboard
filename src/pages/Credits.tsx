@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { CreditCard, Plus, DollarSign, AlertCircle, TrendingUp, Users, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -40,23 +40,23 @@ export default function Credits() {
     setCustomerModalOpen(true);
   };
 
-  const handleSaveCustomer = async (data: any) => {
+  const handleSaveCustomer = useCallback(async (data: any) => {
     if (selectedCustomer) {
       return await updateCustomer(selectedCustomer.id, data);
     } else {
       return await addCustomer(data);
     }
-  };
+  }, [selectedCustomer, updateCustomer, addCustomer]);
 
   const handlePayment = (customer: Customer) => {
     setSelectedCustomer(customer);
     setPaymentModalOpen(true);
   };
 
-  const handleSavePayment = async (amount: number, method: string, description?: string) => {
+  const handleSavePayment = useCallback(async (amount: number, method: string, description?: string) => {
     if (!selectedCustomer) return { success: false };
     return await registerPayment(selectedCustomer.id, amount, method, description);
-  };
+  }, [selectedCustomer, registerPayment]);
 
   if (loading) {
     return (

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Users, Minus, X, Check, Settings2, PlusCircle, Receipt } from 'lucide-react';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { PaymentModal } from '@/components/sales/PaymentModal';
@@ -71,7 +71,7 @@ export default function Tables() {
     setShowManagementModal(true);
   };
 
-  const handleSaveTableManagement = (data: { customer_name?: string; status: 'free' | 'occupied' | 'awaiting_payment' }) => {
+  const handleSaveTableManagement = useCallback((data: { customer_name?: string; status: 'free' | 'occupied' | 'awaiting_payment' }) => {
     if (!managingTable) return;
     const updated = {
       ...data,
@@ -80,9 +80,9 @@ export default function Tables() {
     };
     updateTable(managingTable.id, updated);
     toast({ title: 'Mesa atualizada!' });
-  };
+  }, [managingTable, updateTable]);
 
-  const handleCreateTable = (data: { number: number; name?: string; customer_name?: string }) => {
+  const handleCreateTable = useCallback((data: { number: number; name?: string; customer_name?: string }) => {
     const newTable: Table = {
       id: `table-${Date.now()}`,
       number: data.number,
@@ -93,7 +93,7 @@ export default function Tables() {
     };
     addTable(newTable);
     toast({ title: 'Mesa criada!' });
-  };
+  }, [addTable]);
 
   const addItemToOrder = (product: Product) => {
     const existingItem = orderItems.find(i => i.productId === product.id);
@@ -134,7 +134,7 @@ export default function Tables() {
 
   const total = orderItems.reduce((acc, item) => acc + item.subtotal, 0);
 
-  const handleSaveOrder = () => {
+  const handleSaveOrder = useCallback(() => {
     if (!selectedTable || orderItems.length === 0) return;
 
     const orderId = selectedTable.currentOrderId || `order-${Date.now()}`;
@@ -156,9 +156,9 @@ export default function Tables() {
 
     toast({ title: 'Pedido guardado!' });
     setSelectedTable(null);
-  };
+  }, [selectedTable, orderItems, total, updateOrder, addOrder, updateTable]);
 
-  const handlePaymentConfirm = async (payment: { cash: number; mpesa: number; emola: number; card: number }) => {
+  const handlePaymentConfirm = useCallback(async (payment: { cash: number; mpesa: number; emola: number; card: number }) => {
     if (!selectedTable) return;
 
     try {
@@ -266,9 +266,9 @@ export default function Tables() {
         variant: 'destructive',
       });
     }
-  };
+  }, [selectedTable, total, orderItems, tables, products, ingredients, addSale, business, updateOrder, setTables]);
 
-  const printPreBill = () => {
+  const printPreBill = useCallback(() => {
     if (orderItems.length === 0) {
       toast({
         title: 'Pedido vazio',
@@ -305,9 +305,9 @@ export default function Tables() {
     } catch (error) {
       console.error('Erro ao imprimir:', error);
     }
-  };
+  }, [orderItems, generatePreBillHTML]);
 
-  const generatePreBillHTML = () => {
+  const generatePreBillHTML = useCallback(() => {
     const formatCurrency = (value: number) => `${value.toFixed(2)} MT`;
     const centerText = (text: string, width = 48) => {
       const padding = Math.max(0, Math.floor((width - text.length) / 2));
@@ -401,14 +401,14 @@ export default function Tables() {
         </head>
         <body><pre>${bill.join('\n')}</pre></body>
       </html>`;
-  };
+  }, [business, selectedTable, orderItems, total]);
 
-  const handleRequestPayment = () => {
+  const handleRequestPayment = useCallback(() => {
     if (!selectedTable || orderItems.length === 0) return;
     setShowCreditDialog(true);
-  };
+  }, [selectedTable, orderItems]);
 
-  const handleCreditConfirm = async () => {
+  const handleCreditConfirm = useCallback(async () => {
     if (!selectedTable || !creditCustomerName.trim()) {
       toast({
         title: 'Nome do cliente obrigatório',
@@ -451,7 +451,7 @@ export default function Tables() {
         variant: 'destructive',
       });
     }
-  };
+  }, [selectedTable, creditCustomerName, orderItems, total, registerCreditCharge, updateTable]);
 
   return (
     <div className="space-y-6">

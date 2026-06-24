@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useToast } from '@/hooks/use-toast';
@@ -85,7 +85,7 @@ export function useDatabase() {
   const maxRetries = 3;
 
   // Função auxiliar para tratamento de erros
-  const handleError = (err: unknown, operation: string) => {
+  const handleError = useCallback((err: unknown, operation: string) => {
     const message = err instanceof Error ? err.message : (typeof err === 'string' ? err : 'Erro desconhecido');
     const errorObj: DatabaseError = {
       message,
@@ -106,7 +106,7 @@ export function useDatabase() {
     }
     
     return { error: errorObj };
-  };
+  }, []);
 
   // Carregar dados iniciais com retry
   useEffect(() => {
@@ -585,7 +585,7 @@ export function useDatabase() {
     }
   };
 
-  const loadCredits = async () => {
+  const loadCredits = useCallback(async () => {
     try {
       if (!currentBusiness?.id) return;
 
@@ -617,7 +617,7 @@ export function useDatabase() {
     } catch (err: unknown) {
       handleError(err, 'LOAD_CREDITS');
     }
-  };
+  }, [currentBusiness?.id, handleError]);
 
   const deleteCredit = async (id: string) => {
     try {
@@ -689,7 +689,7 @@ export function useDatabase() {
   }, [products, ingredients]);
 
   // Função para carregar todas as vendas (sem filtro de data)
-  const loadAllSales = async () => {
+  const loadAllSales = useCallback(async () => {
     try {
       if (!currentBusiness?.id) {
         throw new Error('Negócio não encontrado');
@@ -720,7 +720,7 @@ export function useDatabase() {
     } catch (err: unknown) {
       return handleError(err, 'LOAD_ALL_SALES');
     }
-  };
+  }, [currentBusiness?.id, handleError]);
 
   return {
     loading,

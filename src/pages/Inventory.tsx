@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { Package, Plus, Minus, AlertTriangle, Save, Download, Upload } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -35,15 +35,15 @@ export default function Inventory() {
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleExportPDF = () => {
+  const handleExportPDF = useCallback(() => {
     exportInventoryToPDF(ingredients);
     toast({ title: 'PDF exportado!', description: 'Relatório de inventário gerado com sucesso' });
-  };
+  }, [ingredients]);
 
-  const handleExportExcel = () => {
+  const handleExportExcel = useCallback(() => {
     exportInventoryToExcel(ingredients);
     toast({ title: 'Excel exportado!', description: 'Ficheiro Excel gerado com sucesso' });
-  };
+  }, [ingredients]);
 
   const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -84,7 +84,7 @@ export default function Inventory() {
     setDeductDialogOpen(true);
   };
 
-  const handleDeduction = () => {
+  const handleDeduction = useCallback(() => {
     const amount = parseFloat(deductQuantity);
     if (!deductIngredientId || isNaN(amount) || amount <= 0) {
       toast({ title: 'Quantidade inválida', variant: 'destructive' });
@@ -106,9 +106,9 @@ export default function Inventory() {
     });
     toast({ title: 'Stock reduzido', description: `${ingredient.name}: -${amount} ${ingredient.unit}` });
     setDeductDialogOpen(false);
-  };
+  }, [deductQuantity, deductIngredientId, ingredients, updateIngredient, addStockMovement]);
 
-  const handleCreateIngredient = () => {
+  const handleCreateIngredient = useCallback(() => {
     if (!newIngredient.name || !newIngredient.packageName || newIngredient.packageQuantity <= 0) {
       toast({ title: 'Preencha todos os campos', variant: 'destructive' });
       return;
@@ -153,9 +153,9 @@ export default function Inventory() {
       packageQuantity: 0,
     });
     setCreateDialogOpen(false);
-  };
+  }, [newIngredient, addIngredient]);
 
-  const handleAdjustment = () => {
+  const handleAdjustment = useCallback(() => {
     const quantity = parseFloat(adjustmentQuantity);
     if (!selectedIngredientId || isNaN(quantity) || quantity <= 0) {
       toast({ title: 'Quantidade inválida', variant: 'destructive' });
@@ -193,7 +193,7 @@ export default function Inventory() {
     });
 
     setAdjustDialogOpen(false);
-  };
+  }, [adjustmentQuantity, selectedIngredientId, selectedPackage, ingredients, updateIngredient, addStockMovement]);
 
   return (
     <div className="space-y-6">

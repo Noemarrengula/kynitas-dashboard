@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useToast } from '@/hooks/use-toast';
@@ -81,9 +81,9 @@ export function useCredits() {
       return;
     }
     loadData();
-  }, [currentBusiness?.id]);
+  }, [currentBusiness?.id, loadData]);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!currentBusiness?.id) return;
 
     setLoading(true);
@@ -113,9 +113,9 @@ export function useCredits() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentBusiness?.id]);
 
-  const addCustomer = async (customer: Omit<Customer, 'id' | 'businessId' | 'createdAt' | 'updatedAt'>) => {
+  const addCustomer = useCallback(async (customer: Omit<Customer, 'id' | 'businessId' | 'createdAt' | 'updatedAt'>) => {
     try {
       const { data, error } = await supabase
         .from('customers')
@@ -147,9 +147,9 @@ export function useCredits() {
       });
       return { data: null, error };
     }
-  };
+  }, [currentBusiness?.id, customers]);
 
-  const updateCustomer = async (id: string, updates: Partial<Customer>) => {
+  const updateCustomer = useCallback(async (id: string, updates: Partial<Customer>) => {
     try {
       const dbUpdates: Record<string, any> = {};
       if (updates.name !== undefined) dbUpdates.name = updates.name;
@@ -183,9 +183,9 @@ export function useCredits() {
       });
       return { data: null, error };
     }
-  };
+  }, [currentBusiness?.id, customers]);
 
-  const registerPayment = async (
+  const registerPayment = useCallback(async (
     customerId: string,
     amount: number,
     paymentMethod: string,
@@ -217,9 +217,9 @@ export function useCredits() {
       });
       return { success: false, error: getErrorMessage(error) };
     }
-  };
+  }, [currentBusiness?.id, loadData]);
 
-  const findOrCreateCustomer = async (name: string): Promise<Customer | null> => {
+  const findOrCreateCustomer = useCallback(async (name: string): Promise<Customer | null> => {
     if (!currentBusiness?.id) return null;
 
     const existing = customersRef.current.find(c => c.name.toLowerCase() === name.toLowerCase());
@@ -243,9 +243,9 @@ export function useCredits() {
       return customer;
     }
     return null;
-  };
+  }, [currentBusiness?.id, customers]);
 
-  const registerCreditCharge = async (
+  const registerCreditCharge = useCallback(async (
     customerName: string,
     items: any[],
     total: number,
@@ -281,9 +281,9 @@ export function useCredits() {
       });
       return { success: false, error: getErrorMessage(error) };
     }
-  };
+  }, [currentBusiness?.id, findOrCreateCustomer, loadData]);
 
-  const getCustomerTransactions = async (customerId: string) => {
+  const getCustomerTransactions = useCallback(async (customerId: string) => {
     try {
       const { data, error } = await supabase
         .from('credit_transactions')
@@ -301,7 +301,7 @@ export function useCredits() {
       });
       return [];
     }
-  };
+  }, []);
 
   return {
     customers,
