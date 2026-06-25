@@ -20,7 +20,8 @@ import {
   Banknote,
   FileText,
   Target,
-  HardDrive
+  HardDrive,
+  ClipboardList
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useStore } from '@/store/useStore';
@@ -43,6 +44,7 @@ const menuItems = [
   { icon: FileText, label: 'Facturas', path: '/invoices' },
   { icon: BarChart3, label: 'Relatórios', path: '/reports' },
   { icon: HardDrive, label: 'Backup', path: '/backup' },
+  { icon: ClipboardList, label: 'Auditoria', path: '/audit' },
   { icon: DollarSign, label: 'Financeiro', path: '/financial' },
   { icon: Settings, label: 'Configurações', path: '/settings' },
 ];
