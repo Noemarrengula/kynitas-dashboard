@@ -1,4 +1,5 @@
-export const formatCurrency = (value: number) => `${value.toFixed(2)} MT`;
+import { formatCurrency as fc } from './utils';
+export const formatCurrency = (value: number) => fc(value);
 
 export const centerText = (text: string, width = 48) => {
   const padding = Math.max(0, Math.floor((width - text.length) / 2));

@@ -2,7 +2,8 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from './AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { getErrorMessage } from '@/lib/utils';
+import { getErrorMessage, setStoreCurrency as setUtilsCurrency } from '@/lib/utils';
+import { useStore } from '@/store/useStore';
 import type { BusinessRole, BusinessUser } from '@/types/domains/user';
 
 interface Business {
@@ -12,6 +13,7 @@ interface Business {
   address?: string;
   phone?: string;
   nuit?: string;
+  currency?: string;
 }
 
 interface BusinessContextType {
@@ -64,6 +66,9 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
 
       if (business) {
         setCurrentBusiness(business);
+        const cur = business.currency || 'MZN';
+        useStore.getState().setCurrency(cur);
+        setUtilsCurrency(cur);
 
         const businessUser = data?.find(d => d.business_id === business.id);
         if (businessUser) {
@@ -100,6 +105,9 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
     const business = businesses.find(b => b.id === businessId);
     if (business) {
       setCurrentBusiness(business);
+      const cur = business.currency || 'MZN';
+      useStore.getState().setCurrency(cur);
+      setUtilsCurrency(cur);
 
       supabase
         .from('business_users')

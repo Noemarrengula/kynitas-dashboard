@@ -56,6 +56,10 @@ interface AppState {
   invoiceSeries: InvoiceSeries[];
   setInvoiceSeries: (series: InvoiceSeries[]) => void;
 
+  // Currency
+  currency: string;
+  setCurrency: (currency: string) => void;
+
   // Sidebar
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
@@ -132,6 +136,10 @@ export const useStore = create<AppState>((set) => ({
   // Invoice series
   invoiceSeries: [],
   setInvoiceSeries: (series) => set({ invoiceSeries: series }),
+
+  // Currency
+  currency: 'MZN',
+  setCurrency: (currency) => set({ currency }),
 
   // Sidebar
   sidebarOpen: true,

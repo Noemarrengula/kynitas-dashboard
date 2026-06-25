@@ -5,10 +5,18 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('pt-MZ', {
+let _storeCurrency = 'MZN';
+
+export function setStoreCurrency(currency: string) {
+  _storeCurrency = currency;
+}
+
+export function formatCurrency(value: number, currency?: string): string {
+  const cur = currency || _storeCurrency;
+  const locale = cur === 'AOA' ? 'pt-AO' : cur === 'USD' ? 'en-US' : 'pt-MZ';
+  return new Intl.NumberFormat(locale, {
     style: 'currency',
-    currency: 'MZN',
+    currency: cur,
     minimumFractionDigits: 2,
   }).format(value);
 }

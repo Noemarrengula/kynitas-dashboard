@@ -41,6 +41,9 @@ export default function Settings() {
   });
   const [categories, setCategories] = useState(defaultCategories);
   const [newCategory, setNewCategory] = useState({ drinks: '', meals: '' });
+  const setStoreCurrency = useStore(s => s.setCurrency);
+  const [selectedCurrency, setSelectedCurrency] = useState(business?.currency || 'MZN');
+  const savedCurrency = business?.currency || 'MZN';
 
   useEffect(() => {
     if (business) {
@@ -160,6 +163,26 @@ export default function Settings() {
     }
   };
 
+  const handleSaveCurrency = async () => {
+    if (!business?.id) return;
+    try {
+      const { error } = await supabase
+        .from('businesses')
+        .update({ currency: selectedCurrency })
+        .eq('id', business.id);
+      if (error) throw error;
+      setStoreCurrency(selectedCurrency);
+      await refreshBusiness();
+      toast({ title: `Moeda alterada para ${selectedCurrency}` });
+    } catch (error: unknown) {
+      toast({
+        title: 'Erro ao guardar moeda',
+        description: getErrorMessage(error),
+        variant: 'destructive',
+      });
+    }
+  };
+
   const addCategory = async (type: 'drinks' | 'meals') => {
     const value = newCategory[type].trim();
     if (value && !categories[type].includes(value)) {
@@ -264,6 +287,10 @@ export default function Settings() {
           <TabsTrigger value="fiscal" className="gap-2">
             <FileText className="h-4 w-4" />
             Fiscal
+          </TabsTrigger>
+          <TabsTrigger value="currency" className="gap-2">
+            <DollarSign className="h-4 w-4" />
+            Moeda
           </TabsTrigger>
           <TabsTrigger value="users" className="gap-2">
             <Users className="h-4 w-4" />
@@ -519,6 +546,36 @@ export default function Settings() {
                   {' '}<strong>Bebidas</strong>, <strong>Refeições</strong> ou <strong>Stock</strong>.
                 </p>
               </div>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* Currency Tab */}
+        <TabsContent value="currency" className="animate-fade-in">
+          <div className="bg-card border rounded-xl p-6 max-w-2xl">
+            <h3 className="text-lg font-semibold mb-6">Moeda do Negócio</h3>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Moeda principal</Label>
+                <Select
+                  value={selectedCurrency}
+                  onValueChange={setSelectedCurrency}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="MZN">MZN — Metical (Moçambique)</SelectItem>
+                    <SelectItem value="AOA">AOA — Kwanza (Angola)</SelectItem>
+                    <SelectItem value="USD">USD — Dólar Americano</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Afecta a formatação de preços em todo o sistema.
+                  {selectedCurrency !== savedCurrency && ' Clique "Guardar" para aplicar.'}
+                </p>
+              </div>
+              <Button variant="gradient" onClick={handleSaveCurrency}>
+                <Save className="h-4 w-4 mr-2" /> Guardar Moeda
+              </Button>
             </div>
           </div>
         </TabsContent>
