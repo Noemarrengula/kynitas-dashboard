@@ -3,6 +3,7 @@ export * from './domains/sales';
 export * from './domains/credit';
 export * from './domains/transaction';
 export * from './domains/user';
+export * from './domains/invoice';
 
 export interface DashboardMetrics {
   totalSales: number;
@@ -72,6 +73,16 @@ export interface Database {
         Row: import('./domains/user').User;
         Insert: Omit<import('./domains/user').User, 'id'>;
         Update: Partial<Omit<import('./domains/user').User, 'id'>>;
+      };
+      invoices: {
+        Row: import('./domains/invoice').Invoice;
+        Insert: Omit<import('./domains/invoice').Invoice, 'id'>;
+        Update: Partial<Omit<import('./domains/invoice').Invoice, 'id'>>;
+      };
+      invoice_series: {
+        Row: import('./domains/invoice').InvoiceSeries;
+        Insert: Omit<import('./domains/invoice').InvoiceSeries, 'id'>;
+        Update: Partial<Omit<import('./domains/invoice').InvoiceSeries, 'id'>>;
       };
     };
   };

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Product, Table, Order, Sale, StockMovement, User, Ingredient, Credit } from '@/types';
+import { Product, Table, Order, Sale, StockMovement, User, Ingredient, Credit, Invoice, InvoiceSeries } from '@/types';
 
 interface AppState {
   // User
@@ -46,6 +46,16 @@ interface AppState {
   stockMovements: StockMovement[];
   addStockMovement: (movement: StockMovement) => void;
   
+  // Invoices
+  invoices: Invoice[];
+  setInvoices: (invoices: Invoice[]) => void;
+  addInvoice: (invoice: Invoice) => void;
+  updateInvoice: (id: string, invoice: Partial<Invoice>) => void;
+
+  // Invoice series
+  invoiceSeries: InvoiceSeries[];
+  setInvoiceSeries: (series: InvoiceSeries[]) => void;
+
   // Sidebar
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
@@ -111,6 +121,18 @@ export const useStore = create<AppState>((set) => ({
     ingredients: state.ingredients.filter((i) => i.id !== id),
   })),
   
+  // Invoices
+  invoices: [],
+  setInvoices: (invoices) => set({ invoices }),
+  addInvoice: (invoice) => set((state) => ({ invoices: [...state.invoices, invoice] })),
+  updateInvoice: (id, data) => set((state) => ({
+    invoices: state.invoices.map((inv) => inv.id === id ? { ...inv, ...data } : inv),
+  })),
+
+  // Invoice series
+  invoiceSeries: [],
+  setInvoiceSeries: (series) => set({ invoiceSeries: series }),
+
   // Sidebar
   sidebarOpen: true,
   setSidebarOpen: (open) => set({ sidebarOpen: open }),

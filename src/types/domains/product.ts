@@ -14,6 +14,7 @@ export interface Product {
   precoDose?: number;
   dosesPorGarrafa?: number;
   costPrice?: number;
+  ivaRate?: number;
 }
 
 export interface RecipeItem {

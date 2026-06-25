@@ -1,5 +1,5 @@
 import { useState, useCallback, memo } from 'react';
-import { ShoppingCart, Plus, Minus, X, Check, Receipt } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, X, Check, Receipt, FileText } from 'lucide-react';
 import { PaymentModal } from '@/components/sales/PaymentModal';
 import { useDatabase } from '@/hooks/useDatabase';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ import { useBusiness } from '@/contexts/BusinessContext';
 import { sanitizeSaleData, sanitizeSearchQuery } from '@/lib/sanitize';
 import { useCashDrawer } from '@/hooks/useCashDrawer';
 import { useCredits } from '@/hooks/useCredits';
+import { useInvoices } from '@/hooks/useInvoices';
 import { printReceipt } from '@/lib/receipt';
 
 export default function Sales() {
@@ -21,7 +22,11 @@ export default function Sales() {
   const { business } = useBusiness();
   const { open: openCashDrawer } = useCashDrawer();
   const { registerCreditCharge } = useCredits();
+  const { issueInvoice, invoiceSeries } = useInvoices();
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
+  const [lastSaleId, setLastSaleId] = useState<string | null>(null);
+  const [showInvoiceDialog, setShowInvoiceDialog] = useState(false);
+  const [selectedDocType, setSelectedDocType] = useState<'FS' | 'FT' | 'FC'>('FS');
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showCustomPriceDialog, setShowCustomPriceDialog] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -279,6 +284,8 @@ export default function Sales() {
       if (error) {
         throw error;
       }
+
+      setLastSaleId(savedSale.id);
 
       // Abrir gaveta se pagamento em dinheiro
       if (payment.cash > 0) {
@@ -811,6 +818,62 @@ export default function Sales() {
         </DialogContent>
       </Dialog>
 
+      {/* Invoice Dialog */}
+      <Dialog open={showInvoiceDialog} onOpenChange={setShowInvoiceDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Emitir Factura</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Tipo de Documento</Label>
+              <div className="flex gap-2">
+                {(['FS', 'FT', 'FC'] as const).map(type => (
+                  <Button
+                    key={type}
+                    variant={selectedDocType === type ? 'default' : 'outline'}
+                    onClick={() => setSelectedDocType(type)}
+                    className="flex-1"
+                  >
+                    {type === 'FS' ? 'Simplificada' : type === 'FT' ? 'Factura' : 'Consumidor Final'}
+                  </Button>
+                ))}
+              </div>
+            </div>
+            {selectedDocType === 'FT' && (
+              <div className="space-y-2">
+                <Label>Cliente (NUIT obrigatório)</Label>
+                <Input placeholder="Nome do cliente" />
+                <Input placeholder="NUIT" />
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowInvoiceDialog(false)}>Cancelar</Button>
+            <Button onClick={async () => {
+              if (!lastSaleId) return;
+              await issueInvoice(lastSaleId, selectedDocType);
+              setShowInvoiceDialog(false);
+              setLastSaleId(null);
+            }}>
+              Emitir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Invoice Banner */}
+      {lastSaleId && (
+        <div className="fixed bottom-4 right-4 z-50">
+          <Button
+            size="lg"
+            className="shadow-lg"
+            onClick={() => setShowInvoiceDialog(true)}
+          >
+            <FileText className="h-5 w-5 mr-2" /> Emitir Factura
+          </Button>
+        </div>
+      )}
 
     </div>
   );

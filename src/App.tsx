@@ -22,6 +22,7 @@ const StockMovements = lazy(() => import("@/pages/StockMovements"));
 const Inventory = lazy(() => import("@/pages/Inventory"));
 const Sales = lazy(() => import("@/pages/Sales"));
 const SalesHistory = lazy(() => import("@/pages/SalesHistory"));
+const Invoices = lazy(() => import("@/pages/Invoices"));
 const Tables = lazy(() => import("@/pages/Tables"));
 const Reports = lazy(() => import("@/pages/Reports"));
 const Customers = lazy(() => import("@/pages/Customers"));
@@ -81,6 +82,7 @@ const App = () => (
                   <Route path="/sales/history" element={<SalesHistory />} />
                   <Route path="/tables" element={<Tables />} />
                   <Route path="/reports" element={<Reports />} />
+                  <Route path="/invoices" element={<Invoices />} />
                   <Route path="/customers" element={<Customers />} />
                   <Route path="/credits" element={<Credits />} />
                   <Route path="/credits-vendas" element={<CreditsVendas />} />
