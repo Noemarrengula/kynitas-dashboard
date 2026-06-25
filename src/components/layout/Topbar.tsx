@@ -1,4 +1,4 @@
-import { Bell, Search, User, Menu, LogOut, Building2, Check } from 'lucide-react';
+import { Search, User, Menu, LogOut, Building2, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,6 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { useState } from 'react';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ThemeToggle } from '@/components/providers/ThemeToggle';
+import { NotificationCenter } from './NotificationCenter';
 
 export function Topbar() {
   const { user, signOut } = useAuth();
@@ -97,25 +98,7 @@ export function Topbar() {
         <ThemeToggle />
 
         {/* Notifications */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="relative h-9 w-9">
-              <Bell className="h-4 w-4" />
-              {criticalStockCount > 0 && (
-                <Badge className="absolute -top-1 -right-1 h-4 w-4 rounded-full p-0 flex items-center justify-center text-[9px] bg-destructive">
-                  {criticalStockCount}
-                </Badge>
-              )}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-72">
-            <DropdownMenuLabel className="text-xs">Notificações</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <div className="p-4 text-center text-sm text-muted-foreground">
-              Nenhuma notificação
-            </div>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <NotificationCenter />
 
         {/* User Menu */}
         <DropdownMenu>

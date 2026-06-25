@@ -8,6 +8,7 @@ export interface Notification {
   title: string;
   message: string;
   type: 'info' | 'success' | 'warning' | 'error';
+  category?: 'low_stock' | 'goal_achieved' | 'new_sale' | 'system';
   timestamp: Date;
   read: boolean;
   action?: {
