@@ -8,6 +8,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { BusinessProvider } from "@/contexts/BusinessContext";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useAutoBackup } from "@/hooks/useAutoBackup";
 import { logger } from "@/lib/logger";
 import Login from "@/pages/Login";
@@ -72,24 +73,24 @@ const App = () => (
                 <Route path="/register" element={<Register />} />
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
-                  <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/products/drinks" element={<Drinks />} />
-                  <Route path="/products/meals" element={<Meals />} />
-                  <Route path="/stock" element={<Stock />} />
-                  <Route path="/stock/movements" element={<StockMovements />} />
-                  <Route path="/inventory" element={<Inventory />} />
-                  <Route path="/sales" element={<Sales />} />
-                  <Route path="/sales/history" element={<SalesHistory />} />
-                  <Route path="/tables" element={<Tables />} />
-                  <Route path="/reports" element={<Reports />} />
-                  <Route path="/invoices" element={<Invoices />} />
-                  <Route path="/customers" element={<Customers />} />
-                  <Route path="/credits" element={<Credits />} />
-                  <Route path="/credits-vendas" element={<CreditsVendas />} />
-                  <Route path="/financial" element={<Financial />} />
-                  <Route path="/employees" element={<Employees />} />
-                  <Route path="/settings" element={<Settings />} />
-                  <Route path="/settings/users" element={<ProtectedRoute requireSuperAdmin><Users /></ProtectedRoute>} />
+                  <Route path="/dashboard" element={<ErrorBoundary><Dashboard /></ErrorBoundary>} />
+                  <Route path="/products/drinks" element={<ErrorBoundary><Drinks /></ErrorBoundary>} />
+                  <Route path="/products/meals" element={<ErrorBoundary><Meals /></ErrorBoundary>} />
+                  <Route path="/stock" element={<ErrorBoundary><Stock /></ErrorBoundary>} />
+                  <Route path="/stock/movements" element={<ErrorBoundary><StockMovements /></ErrorBoundary>} />
+                  <Route path="/inventory" element={<ErrorBoundary><Inventory /></ErrorBoundary>} />
+                  <Route path="/sales" element={<ErrorBoundary><Sales /></ErrorBoundary>} />
+                  <Route path="/sales/history" element={<ErrorBoundary><SalesHistory /></ErrorBoundary>} />
+                  <Route path="/tables" element={<ErrorBoundary><Tables /></ErrorBoundary>} />
+                  <Route path="/reports" element={<ErrorBoundary><Reports /></ErrorBoundary>} />
+                  <Route path="/invoices" element={<ErrorBoundary><Invoices /></ErrorBoundary>} />
+                  <Route path="/customers" element={<ErrorBoundary><Customers /></ErrorBoundary>} />
+                  <Route path="/credits" element={<ErrorBoundary><Credits /></ErrorBoundary>} />
+                  <Route path="/credits-vendas" element={<ErrorBoundary><CreditsVendas /></ErrorBoundary>} />
+                  <Route path="/financial" element={<ErrorBoundary><Financial /></ErrorBoundary>} />
+                  <Route path="/employees" element={<ErrorBoundary><Employees /></ErrorBoundary>} />
+                  <Route path="/settings" element={<ErrorBoundary><Settings /></ErrorBoundary>} />
+                  <Route path="/settings/users" element={<ErrorBoundary><ProtectedRoute requireSuperAdmin><Users /></ProtectedRoute></ErrorBoundary>} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>
