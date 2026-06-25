@@ -19,7 +19,8 @@ import {
   X,
   Banknote,
   FileText,
-  Target
+  Target,
+  HardDrive
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useStore } from '@/store/useStore';
@@ -41,6 +42,7 @@ const menuItems = [
   { icon: Target, label: 'Metas', path: '/goals' },
   { icon: FileText, label: 'Facturas', path: '/invoices' },
   { icon: BarChart3, label: 'Relatórios', path: '/reports' },
+  { icon: HardDrive, label: 'Backup', path: '/backup' },
   { icon: DollarSign, label: 'Financeiro', path: '/financial' },
   { icon: Settings, label: 'Configurações', path: '/settings' },
 ];
