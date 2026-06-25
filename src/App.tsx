@@ -36,6 +36,7 @@ const Employees = lazy(() => import("@/pages/Employees"));
 const GoalsPage = lazy(() => import("@/pages/Goals"));
 const BackupPage = lazy(() => import("@/pages/Backup"));
 const AuditPage = lazy(() => import("@/pages/Audit"));
+const ExecutivePage = lazy(() => import("@/pages/Executive"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -95,6 +96,7 @@ const App = () => (
                   <Route path="/goals" element={<ErrorBoundary><GoalsPage /></ErrorBoundary>} />
                   <Route path="/backup" element={<ErrorBoundary><BackupPage /></ErrorBoundary>} />
                   <Route path="/audit" element={<ErrorBoundary><AuditPage /></ErrorBoundary>} />
+                  <Route path="/executive" element={<ErrorBoundary><ExecutivePage /></ErrorBoundary>} />
                   <Route path="/settings" element={<ErrorBoundary><Settings /></ErrorBoundary>} />
                   <Route path="/settings/users" element={<ErrorBoundary><ProtectedRoute requireSuperAdmin><Users /></ProtectedRoute></ErrorBoundary>} />
                 </Route>

@@ -1,6 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, 
+  TrendingUp,
   Wine, 
   UtensilsCrossed, 
   Package, 
@@ -30,6 +31,7 @@ import { useEffect } from 'react';
 
 const menuItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
+  { icon: TrendingUp, label: 'Executivo', path: '/executive' },
   { icon: Wine, label: 'Bebidas', path: '/products/drinks' },
   { icon: UtensilsCrossed, label: 'Refeições', path: '/products/meals' },
   { icon: Warehouse, label: 'Inventário', path: '/inventory' },
