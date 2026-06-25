@@ -18,7 +18,8 @@ import {
   UserCircle,
   X,
   Banknote,
-  FileText
+  FileText,
+  Target
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useStore } from '@/store/useStore';
@@ -37,6 +38,7 @@ const menuItems = [
   { icon: Banknote, label: 'Créditos', path: '/credits-vendas' },
   { icon: UserCircle, label: 'Clientes', path: '/customers' },
   { icon: UserCog, label: 'Funcionários', path: '/employees' },
+  { icon: Target, label: 'Metas', path: '/goals' },
   { icon: FileText, label: 'Facturas', path: '/invoices' },
   { icon: BarChart3, label: 'Relatórios', path: '/reports' },
   { icon: DollarSign, label: 'Financeiro', path: '/financial' },

@@ -14,10 +14,12 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { startOfWeek, startOfMonth, endOfWeek, endOfMonth } from 'date-fns';
+import { useBusinessGoals } from '@/hooks/useBusinessGoals';
 
 export default function Dashboard() {
   const { loading, loadAllSales } = useDatabase();
   const { orders, products, sales, ingredients } = useStore();
+  const { goals } = useBusinessGoals();
   
   const now = new Date();
   const weekStart = startOfWeek(now, { weekStartsOn: 1 });
@@ -319,6 +321,38 @@ export default function Dashboard() {
         </Card>
       )}
 
+      {goals.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <TrendingUp className="h-5 w-5" />
+              Metas
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {goals.slice(0, 6).map(goal => (
+                <div key={goal.id} className="space-y-1">
+                  <div className="flex justify-between text-sm">
+                    <span className="font-medium">{goal.category === 'revenue' ? 'Receita' : goal.category === 'sales_count' ? 'Vendas' : 'Ticket Médio'}</span>
+                    <span className="text-muted-foreground">{goal.progress.toFixed(0)}%</span>
+                  </div>
+                  <div className="h-2 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${goal.status === 'achieved' || goal.status === 'overachieved' ? 'bg-green-500' : 'bg-primary'}`}
+                      style={{ width: `${Math.min(goal.progress, 100)}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>{goal.current.toLocaleString('pt-MZ', { minimumFractionDigits: 0 })}</span>
+                    <span>Meta: {goal.target.toLocaleString('pt-MZ', { minimumFractionDigits: 0 })}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
     </div>
   );
