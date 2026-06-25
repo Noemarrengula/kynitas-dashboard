@@ -1,14 +1,17 @@
 import { useState, useMemo } from 'react';
-import { FileText, Search, XCircle, Printer, ChevronLeft, ChevronRight } from 'lucide-react';
+import { FileText, Search, XCircle, Printer, ChevronLeft, ChevronRight, FileSpreadsheet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { useInvoices } from '@/hooks/useInvoices';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { printInvoice } from '@/lib/invoice';
+import { InvoiceA4 } from '@/components/invoice/InvoiceA4';
 import { Invoice, DocumentType } from '@/types';
+import { formatCurrency } from '@/lib/utils';
 
 const statusLabels: Record<string, string> = {
   draft: 'Rascunho',
@@ -38,6 +41,7 @@ export default function Invoices() {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [page, setPage] = useState(1);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [a4Invoice, setA4Invoice] = useState<Invoice | null>(null);
 
   const safeSearch = search.toLowerCase();
 
@@ -130,8 +134,8 @@ export default function Invoices() {
                     )}
                   </div>
                   <div className="text-right space-y-1">
-                    <div className="font-semibold">{invoice.total.toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MT</div>
-                    <div className="text-xs text-muted-foreground">IVA: {invoice.ivaAmount.toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MT</div>
+                    <div className="font-semibold">{formatCurrency(invoice.total)}</div>
+                    <div className="text-xs text-muted-foreground">IVA: {formatCurrency(invoice.ivaAmount)}</div>
                   </div>
                 </div>
                 <div className="flex gap-2 mt-3 pt-3 border-t">
@@ -139,7 +143,10 @@ export default function Invoices() {
                     const result = await reprintInvoice(invoice.id);
                     if (result.data) printInvoice(result.data, business);
                   }}>
-                    <Printer className="h-4 w-4 mr-1" /> Reimprimir
+                    <Printer className="h-4 w-4 mr-1" /> Térmico
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setA4Invoice(invoice)}>
+                    <FileSpreadsheet className="h-4 w-4 mr-1" /> A4
                   </Button>
                   {invoice.status === 'issued' && (
                     <Button variant="outline" size="sm" className="text-red-600" onClick={() => handleCancel(invoice)} disabled={cancellingId === invoice.id}>
@@ -164,6 +171,12 @@ export default function Invoices() {
           )}
         </div>
       )}
+
+      <Dialog open={!!a4Invoice} onOpenChange={v => !v && setA4Invoice(null)}>
+        <DialogContent className="max-w-4xl print:max-w-full print:shadow-none print:border-none">
+          {a4Invoice && <InvoiceA4 invoice={a4Invoice} />}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

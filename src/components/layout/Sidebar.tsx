@@ -45,6 +45,7 @@ const menuItems = [
   { icon: Target, label: 'Metas', path: '/goals' },
   { icon: FileText, label: 'Facturas', path: '/invoices' },
   { icon: BarChart3, label: 'Relatórios', path: '/reports' },
+  { icon: FileText, label: 'IVA', path: '/iva-report' },
   { icon: HardDrive, label: 'Backup', path: '/backup' },
   { icon: ClipboardList, label: 'Auditoria', path: '/audit' },
   { icon: DollarSign, label: 'Financeiro', path: '/financial' },

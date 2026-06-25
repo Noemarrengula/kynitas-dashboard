@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Label } from '@/components/ui/label';
 import { OrderItem, Product } from '@/types';
 import { toast } from '@/hooks/use-toast';
-import { cn, getErrorMessage } from '@/lib/utils';
+import { cn, getErrorMessage, formatCurrency } from '@/lib/utils';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { sanitizeSaleData, sanitizeSearchQuery } from '@/lib/sanitize';
 import { useCashDrawer } from '@/hooks/useCashDrawer';
@@ -33,6 +33,7 @@ export default function Sales() {
   const [customPrice, setCustomPrice] = useState('');
 
   const [showFractionDialog, setShowFractionDialog] = useState(false);
+  const [discountPercent, setDiscountPercent] = useState(0);
   const [fractionProduct, setFractionProduct] = useState<Product | null>(null);
   const [bottleQty, setBottleQty] = useState(0);
   const [shotQty, setShotQty] = useState(0);
@@ -258,15 +259,19 @@ export default function Sales() {
   };
 
   const total = orderItems.reduce((acc, item) => acc + item.subtotal, 0);
+  const discountAmount = total * (discountPercent / 100);
+  const finalTotal = total - discountAmount;
 
   const handlePaymentConfirm = useCallback(async (payment: { cash: number; mpesa: number; emola: number; card: number }) => {
     try {
       const totalReceived = payment.cash + payment.mpesa + payment.emola + payment.card;
-      const change = totalReceived - total;
+      const effectiveTotal = discountPercent > 0 ? finalTotal : total;
+      const change = totalReceived - effectiveTotal;
 
       const saleData = {
         items: orderItems,
-        total,
+        total: effectiveTotal,
+        discount: discountPercent,
         paymentDetails: {
           cash: payment.cash,
           mpesa: payment.mpesa,
@@ -361,7 +366,7 @@ export default function Sales() {
         variant: 'destructive',
       });
     }
-  }, [total, orderItems, products, ingredients, addSale, business, openCashDrawer]);
+  }, [total, finalTotal, discountPercent, orderItems, products, ingredients, addSale, business, openCashDrawer]);
 
   const handleCreditConfirm = useCallback(async (customerName: string) => {
     try {
@@ -649,10 +654,31 @@ export default function Sales() {
           )}
 
           {/* Total */}
-          <div className="border-t pt-4 mb-4">
-            <div className="flex justify-between text-xl font-bold">
+          <div className="border-t pt-4 mb-4 space-y-2">
+            <div className="flex justify-between text-sm">
+              <span>Subtotal</span>
+              <span>{formatCurrency(total)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm">Desconto (%)</span>
+              <Input
+                type="number"
+                min="0"
+                max="100"
+                value={discountPercent || ''}
+                onChange={e => setDiscountPercent(Math.min(100, Math.max(0, Number(e.target.value) || 0)))}
+                className="w-20 h-8 text-sm text-right"
+              />
+            </div>
+            {discountPercent > 0 && (
+              <div className="flex justify-between text-sm text-green-600">
+                <span>Desconto ({discountPercent}%)</span>
+                <span>-{formatCurrency(discountAmount)}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-xl font-bold pt-2 border-t">
               <span>Total</span>
-              <span className="text-primary">{total.toLocaleString('pt-MZ')} MT</span>
+              <span className="text-primary">{formatCurrency(finalTotal)}</span>
             </div>
           </div>
 
@@ -684,7 +710,7 @@ export default function Sales() {
       <PaymentModal
         open={showPaymentModal}
         onClose={() => setShowPaymentModal(false)}
-        totalAmount={total}
+        totalAmount={finalTotal}
         onConfirm={handlePaymentConfirm}
         onCredit={handleCreditConfirm}
       />
