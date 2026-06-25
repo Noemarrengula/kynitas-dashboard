@@ -3,6 +3,13 @@
 -- ============================================================================
 
 -- 1. Views analíticas (apenas leitura, não precisam de RLS — herdam da tabela base)
+
+-- Drop existentes primeiro para evitar conflitos de colunas ao recriar
+DROP VIEW IF EXISTS top_selling_products CASCADE;
+DROP VIEW IF EXISTS sales_by_hour CASCADE;
+DROP VIEW IF EXISTS sales_by_weekday CASCADE;
+DROP VIEW IF EXISTS daily_performance CASCADE;
+
 CREATE OR REPLACE VIEW sales_by_hour AS
 SELECT
   business_id,
