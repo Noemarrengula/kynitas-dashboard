@@ -2,7 +2,9 @@
 -- FASE 8: Auditoria / Activity Log
 -- ============================================================================
 
-CREATE TABLE IF NOT EXISTS audit_logs (
+DROP TABLE IF EXISTS audit_logs CASCADE;
+
+CREATE TABLE audit_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   business_id UUID NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
   user_id UUID REFERENCES auth.users(id),
