@@ -1,11 +1,13 @@
 import { useState, useMemo } from 'react';
-import { FileText, Search, XCircle, Printer, Download, ChevronLeft, ChevronRight } from 'lucide-react';
+import { FileText, Search, XCircle, Printer, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { useInvoices } from '@/hooks/useInvoices';
+import { useBusiness } from '@/contexts/BusinessContext';
+import { printInvoice } from '@/lib/invoice';
 import { Invoice, DocumentType } from '@/types';
 
 const statusLabels: Record<string, string> = {
@@ -31,6 +33,7 @@ const ITEMS_PER_PAGE = 20;
 
 export default function Invoices() {
   const { invoices, loading, cancelInvoice, reprintInvoice } = useInvoices();
+  const { business } = useBusiness();
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [page, setPage] = useState(1);
@@ -132,7 +135,10 @@ export default function Invoices() {
                   </div>
                 </div>
                 <div className="flex gap-2 mt-3 pt-3 border-t">
-                  <Button variant="outline" size="sm" onClick={() => reprintInvoice(invoice.id)}>
+                  <Button variant="outline" size="sm" onClick={async () => {
+                    const result = await reprintInvoice(invoice.id);
+                    if (result.data) printInvoice(result.data, business);
+                  }}>
                     <Printer className="h-4 w-4 mr-1" /> Reimprimir
                   </Button>
                   {invoice.status === 'issued' && (

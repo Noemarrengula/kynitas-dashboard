@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, User, Tag, Users, Save, Building2, Printer, Database, DollarSign } from 'lucide-react';
+import { Settings as SettingsIcon, User, Tag, Users, Save, Building2, Printer, Database, DollarSign, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useStore } from '@/store/useStore';
 import { useBusiness } from '@/contexts/BusinessContext';
+import { useInvoices } from '@/hooks/useInvoices';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/hooks/use-toast';
 import { getErrorMessage } from '@/lib/utils';
@@ -26,6 +27,7 @@ const defaultCategories = {
 export default function Settings() {
   const { user, setUser } = useStore();
   const { business, refreshBusiness } = useBusiness();
+  const { invoiceSeries } = useInvoices();
   const [profile, setProfile] = useState({
     name: user?.name || '',
     email: user?.email || '',
@@ -259,6 +261,10 @@ export default function Settings() {
             <DollarSign className="h-4 w-4" />
             Gaveta
           </TabsTrigger>
+          <TabsTrigger value="fiscal" className="gap-2">
+            <FileText className="h-4 w-4" />
+            Fiscal
+          </TabsTrigger>
           <TabsTrigger value="users" className="gap-2">
             <Users className="h-4 w-4" />
             Utilizadores
@@ -472,6 +478,48 @@ export default function Settings() {
         <TabsContent value="cashdrawer" className="animate-fade-in">
           <div className="max-w-2xl">
             <CashDrawerSettings />
+          </div>
+        </TabsContent>
+
+        {/* Fiscal Tab */}
+        <TabsContent value="fiscal" className="animate-fade-in">
+          <div className="bg-card border rounded-xl p-6 max-w-2xl">
+            <h3 className="text-lg font-semibold mb-6">Configuração Fiscal</h3>
+
+            <div className="space-y-6">
+              <div>
+                <h4 className="font-medium mb-3">Séries de Documentos</h4>
+                <div className="space-y-3">
+                  {invoiceSeries.map(series => (
+                    <div key={series.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div>
+                        <p className="font-medium">{series.prefix}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {series.documentType === 'FT' ? 'Factura' :
+                           series.documentType === 'FS' ? 'Factura Simplificada' :
+                           series.documentType === 'FC' ? 'Factura Consumidor Final' : 'Nota de Crédito'}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm">Nº actual: <span className="font-mono font-medium">{series.currentNumber}</span></p>
+                        <p className="text-xs text-muted-foreground">Início: {series.startNumber}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="border-t pt-6">
+                <h4 className="font-medium mb-2">IVA (Imposto sobre o Valor Acrescentado)</h4>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Taxa standard: <strong>16%</strong> | Reduzida: <strong>10%</strong> | Isenta: <strong>0%</strong>
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  A taxa de IVA de cada produto é configurada individualmente nas páginas de
+                  {' '}<strong>Bebidas</strong>, <strong>Refeições</strong> ou <strong>Stock</strong>.
+                </p>
+              </div>
+            </div>
           </div>
         </TabsContent>
 

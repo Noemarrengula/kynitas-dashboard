@@ -48,6 +48,7 @@ const ProductModal = memo(function ProductModal({ open, onClose, product, type }
     precoDose: '',
     dosesPorGarrafa: '',
     costPrice: '',
+    ivaRate: '16',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -68,6 +69,7 @@ const ProductModal = memo(function ProductModal({ open, onClose, product, type }
         precoDose: product.precoDose?.toString() || '',
         dosesPorGarrafa: product.dosesPorGarrafa?.toString() || '',
         costPrice: product.costPrice?.toString() || '',
+        ivaRate: product.ivaRate?.toString() || '16',
       });
     } else {
       setFormData({
@@ -83,6 +85,7 @@ const ProductModal = memo(function ProductModal({ open, onClose, product, type }
         precoDose: '',
         dosesPorGarrafa: '',
         costPrice: '',
+        ivaRate: '16',
       });
     }
     setErrors({});
@@ -115,6 +118,7 @@ const ProductModal = memo(function ProductModal({ open, onClose, product, type }
       image: formData.image || undefined,
       type,
       costPrice: formData.costPrice ? Number(formData.costPrice) : undefined,
+      ivaRate: Number(formData.ivaRate),
       ...(type === 'meal' && {
         recipe: [],
         estimatedCost: Number(formData.estimatedCost) || undefined,
@@ -223,6 +227,21 @@ const ProductModal = memo(function ProductModal({ open, onClose, product, type }
                 value={formData.costPrice}
                 onChange={(e) => setFormData({ ...formData, costPrice: e.target.value })}
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label>IVA</Label>
+              <Select value={formData.ivaRate} onValueChange={(v) => setFormData({ ...formData, ivaRate: v })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="16">16% (Standard)</SelectItem>
+                  <SelectItem value="10">10% (Reduzido)</SelectItem>
+                  <SelectItem value="5">5% (Taxa mínima)</SelectItem>
+                  <SelectItem value="0">0% (Isento)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
