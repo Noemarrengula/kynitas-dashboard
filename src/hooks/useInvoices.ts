@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useToast } from '@/hooks/use-toast';
+import { useAuditLog } from './useAuditLog';
 import { useStore } from '@/store/useStore';
 import { Invoice, InvoiceSeries, DocumentType } from '@/types';
 
@@ -57,6 +58,7 @@ function toInvoiceSeries(db: any): InvoiceSeries {
 export function useInvoices() {
   const { currentBusiness } = useBusiness();
   const { toast } = useToast();
+  const { log: auditLog } = useAuditLog();
   const invoices = useStore(s => s.invoices);
   const invoiceSeries = useStore(s => s.invoiceSeries);
   const [loading, setLoading] = useState(true);
@@ -165,6 +167,7 @@ export function useInvoices() {
       useStore.getState().addInvoice(invoice);
 
       toast({ title: 'Factura emitida', description: `${documentType} ${series.prefix}-${nextNumber}` });
+      auditLog('invoice', 'invoices', invoice.id, { documentType, series: series.prefix, number: nextNumber, total });
 
       return { data: invoice, error: null };
     } catch (err: unknown) {
@@ -189,6 +192,7 @@ export function useInvoices() {
       useStore.getState().updateInvoice(invoiceId, { status: 'cancelled', cancellationReason: reason });
 
       toast({ title: 'Factura cancelada', variant: 'destructive' });
+      auditLog('delete', 'invoices', invoiceId, { reason });
       return { error: null };
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Erro ao cancelar factura';

@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useToast } from '@/hooks/use-toast';
+import { useAuditLog } from './useAuditLog';
 import { useStore } from '@/store/useStore';
 import { Product, Ingredient, Sale, Credit } from '@/types';
 
@@ -75,6 +76,7 @@ function toCamelCase(obj: Record<string, any>): Record<string, any> {
 export function useDatabase() {
   const { currentBusiness } = useBusiness();
   const { toast } = useToast();
+  const { log: auditLog } = useAuditLog();
   const products = useStore(s => s.products);
   const ingredients = useStore(s => s.ingredients);
   const sales = useStore(s => s.sales);
@@ -219,6 +221,7 @@ export function useDatabase() {
           title: 'Produto criado',
           description: `${product.name} foi adicionado com sucesso`,
         });
+        auditLog('create', 'products', data.id, { name: product.name });
       }
       return { data, error: null };
     } catch (err: unknown) {
@@ -250,6 +253,7 @@ export function useDatabase() {
           title: 'Produto atualizado',
           description: 'Alterações salvas com sucesso',
         });
+        auditLog('update', 'products', id);
       }
       return { data, error: null };
     } catch (err: unknown) {
@@ -276,6 +280,7 @@ export function useDatabase() {
         title: 'Produto removido',
         description: 'Produto foi deletado com sucesso',
       });
+      auditLog('delete', 'products', id);
       return { error: null };
     } catch (err: unknown) {
       return handleError(err, 'DELETE_PRODUCT');
@@ -303,6 +308,7 @@ export function useDatabase() {
           title: 'Ingrediente criado',
           description: `${ingredient.name} foi adicionado com sucesso`,
         });
+        auditLog('create', 'ingredients', data.id, { name: ingredient.name });
       }
       return { data, error: null };
     } catch (err: unknown) {
@@ -328,6 +334,7 @@ export function useDatabase() {
 
       if (data) {
         useStore.getState().updateIngredient(id, toCamelCase(data) as Partial<Ingredient>);
+        auditLog('update', 'ingredients', id);
       }
       return { data, error: null };
     } catch (err: unknown) {
@@ -353,6 +360,7 @@ export function useDatabase() {
       toast({
         title: 'Ingrediente removido',
       });
+      auditLog('delete', 'ingredients', id);
       return { error: null };
     } catch (err: unknown) {
       return handleError(err, 'DELETE_INGREDIENT');
@@ -417,7 +425,8 @@ export function useDatabase() {
       };
       
       useStore.getState().addSale(transformedSale);
-      
+      auditLog('sale', 'sales', data.id, { total: sale.total, paymentMethod: sale.paymentDetails?.method });
+
       // Atualizar stock localmente
       const updatedProducts = useStore.getState().products.map(product => {
         const saleItems = sale.items.filter(item => item.productId === product.id);
@@ -491,6 +500,8 @@ export function useDatabase() {
         title: 'Crédito registrado',
         description: `Venda a crédito para ${credit.customerName} foi salva com sucesso`,
       });
+
+      auditLog('create', 'credits', data.id, { customerName: credit.customerName, total: credit.total });
 
       return { data: transformedCredit, error: null };
     } catch (err: unknown) {
@@ -579,6 +590,8 @@ export function useDatabase() {
         description: `Pagamento de ${amount.toLocaleString('pt-AO', { style: 'currency', currency: 'AOA' })} foi registrado`,
       });
 
+      auditLog('payment', 'credits', creditId, { amount, paymentMethod });
+
       return { data: transformedCredit, error: null };
     } catch (err: unknown) {
       return handleError(err, 'PAY_CREDIT');
@@ -639,6 +652,8 @@ export function useDatabase() {
         title: 'Crédito removido',
         description: 'O crédito foi removido com sucesso',
       });
+
+      auditLog('delete', 'credits', id);
 
       return { error: null };
     } catch (err: unknown) {

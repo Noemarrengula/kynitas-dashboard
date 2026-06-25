@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useToast } from '@/hooks/use-toast';
+import { useAuditLog } from './useAuditLog';
 import { getErrorMessage } from '@/lib/utils';
 
 export interface Customer {
@@ -69,6 +70,7 @@ function toCreditTransaction(db: any): CreditTransaction {
 export function useCredits() {
   const { currentBusiness } = useBusiness();
   const { toast } = useToast();
+  const { log: auditLog } = useAuditLog();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [transactions, setTransactions] = useState<CreditTransaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -137,6 +139,7 @@ export function useCredits() {
       if (data) {
         setCustomers([...customers, toCustomer(data)]);
         toast({ title: 'Cliente cadastrado com sucesso!' });
+        auditLog('create', 'customers', data.id, { name: customer.name });
       }
       return { data: data ? toCustomer(data) : null, error: null };
     } catch (error: unknown) {
@@ -173,6 +176,7 @@ export function useCredits() {
       if (data) {
         setCustomers(customers.map(c => c.id === id ? toCustomer(data) : c));
         toast({ title: 'Cliente atualizado com sucesso!' });
+        auditLog('update', 'customers', id);
       }
       return { data: data ? toCustomer(data) : null, error: null };
     } catch (error: unknown) {
@@ -205,6 +209,7 @@ export function useCredits() {
       if (data?.success) {
         await loadData();
         toast({ title: 'Pagamento registrado com sucesso!' });
+        auditLog('payment', 'customers', customerId, { amount, paymentMethod });
         return { success: true, data };
       } else {
         throw new Error(data?.error || 'Erro ao registrar pagamento');

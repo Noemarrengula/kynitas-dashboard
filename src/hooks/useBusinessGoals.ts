@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect, useMemo } from 'react';
 import { useDatabase } from './useDatabase';
 import { useBusiness } from '@/contexts/BusinessContext';
+import { useAuditLog } from './useAuditLog';
 import { supabase } from '@/lib/supabase';
 import { startOfDay, startOfWeek, startOfMonth, endOfDay, endOfWeek, endOfMonth } from 'date-fns';
 
@@ -31,6 +32,7 @@ export interface KPI {
 export function useBusinessGoals() {
   const { currentBusiness } = useBusiness();
   const { sales, products } = useDatabase();
+  const { log: auditLog } = useAuditLog();
   const [goals, setGoals] = useState<BusinessGoal[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -260,6 +262,7 @@ export function useBusinessGoals() {
 
       if (error) throw error;
       setGoals(prev => [data, ...prev]);
+      auditLog('create', 'goals', data.id, { type: goalData.type, category: goalData.category, target: goalData.target });
       return data;
     } catch (error) {
       console.error('Erro ao criar meta:', error);
@@ -278,6 +281,7 @@ export function useBusinessGoals() {
 
       if (error) throw error;
       setGoals(prev => prev.map(g => g.id === id ? data : g));
+      auditLog('update', 'goals', id, updates);
       return data;
     } catch (error) {
       console.error('Erro ao atualizar meta:', error);
@@ -294,6 +298,7 @@ export function useBusinessGoals() {
 
       if (error) throw error;
       setGoals(prev => prev.filter(g => g.id !== id));
+      auditLog('delete', 'goals', id);
     } catch (error) {
       console.error('Erro ao deletar meta:', error);
       throw error;
