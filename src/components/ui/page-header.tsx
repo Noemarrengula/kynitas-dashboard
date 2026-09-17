@@ -19,8 +19,8 @@ export function PageHeader({ title, description, icon, children, className }: Pa
           </span>
         )}
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold leading-tight">{title}</h1>
-          {description && <p className="text-muted-foreground text-sm mt-0.5">{description}</p>}
+          <h1 className="text-h1">{title}</h1>
+          {description && <p className="text-muted-foreground text-sm mt-1">{description}</p>}
         </div>
       </div>
       {children && <div className="flex items-center gap-2 flex-wrap">{children}</div>}

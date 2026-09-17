@@ -36,6 +36,9 @@
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
 
+    --info: 221 83% 53%;
+    --info-foreground: 0 0% 100%;
+
     --border: 0 0% 90%;
     --input: 0 0% 88%;
     --ring: 357 100% 58%;
@@ -89,6 +92,15 @@
     --destructive: 0 62% 50%;
     --destructive-foreground: 0 0% 100%;
 
+    --success: 142 70% 42%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 56%;
+    --warning-foreground: 0 0% 100%;
+
+    --info: 221 75% 60%;
+    --info-foreground: 0 0% 100%;
+
     --border: 0 0% 20%;
     --input: 0 0% 18%;
     --ring: 357 100% 58%;
@@ -123,6 +135,53 @@
 
   h1, h2, h3, h4, h5, h6 {
     @apply font-semibold tracking-tight;
+  }
+
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring) / 0.6);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  /* Hierarquia tipográfica Marrengula IT */
+  .text-h1 {
+    font-size: 2rem;
+    line-height: 1.2;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .text-h2 {
+    font-size: 1.5rem;
+    line-height: 1.25;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .text-h3 {
+    font-size: 1.125rem;
+    line-height: 1.4;
+    font-weight: 600;
+  }
+
+  .text-body-sm {
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .text-micro {
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  /* Valor KPI (28px, peso 700) */
+  .kpi-value {
+    font-size: 1.75rem;
+    line-height: 1.15;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
   }
 }
 
@@ -250,11 +309,11 @@
   }
 
   .sidebar-collapsed {
-    width: 64px;
+    width: 80px;
   }
 
   .sidebar-expanded {
-    width: 220px;
+    width: 260px;
   }
 
   /* Listas/áreas de dados com fundo preto */

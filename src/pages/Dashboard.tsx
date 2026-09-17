@@ -1,6 +1,6 @@
 import { useMemo, useState, type ComponentType } from 'react';
 import { ShoppingCart, AlertTriangle, Banknote, CreditCard, Smartphone, Package, Calendar, Receipt, RefreshCw, Target } from 'lucide-react';
-import { QuickStat } from '@/components/dashboard/QuickStat';
+import { MetricCard } from '@/components/ui/metric-card';
 import { DateFilter, type DateRange } from '@/components/dashboard/DateFilter';
 import { SalesChart } from '@/components/dashboard/SalesChart';
 import { TopProducts } from '@/components/dashboard/TopProducts';
@@ -214,27 +214,29 @@ export default function Dashboard() {
 
       {/* Métricas do período */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <QuickStat
+        <MetricCard
           title="Receita do Período"
-          value={metrics.revenue}
-          format="currency"
-          change={getTrend(metrics.revenue, metrics.prevRevenue)}
+          value={formatCurrency(metrics.revenue)}
+          icon={Banknote}
+          trend={getTrend(metrics.revenue, metrics.prevRevenue)}
         />
-        <QuickStat
+        <MetricCard
           title="Vendas no Período"
           value={metrics.count}
-          change={getTrend(metrics.count, metrics.prevCount)}
+          icon={Receipt}
+          trend={getTrend(metrics.count, metrics.prevCount)}
         />
-        <QuickStat
+        <MetricCard
           title="Ticket Médio"
-          value={metrics.avgTicket}
-          format="currency"
-          change={getTrend(metrics.avgTicket, metrics.prevAvgTicket)}
+          value={formatCurrency(metrics.avgTicket)}
+          icon={ShoppingCart}
+          trend={getTrend(metrics.avgTicket, metrics.prevAvgTicket)}
         />
-        <QuickStat
+        <MetricCard
           title="Produtos Vendidos"
           value={metrics.productsSold}
-          change={getTrend(metrics.productsSold, metrics.prevProductsSold)}
+          icon={Package}
+          trend={getTrend(metrics.productsSold, metrics.prevProductsSold)}
         />
       </div>
 

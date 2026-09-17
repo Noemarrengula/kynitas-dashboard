@@ -1,5 +1,5 @@
 ﻿import { useState, useRef, useEffect } from 'react';
-import { Search, Command } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -68,6 +68,17 @@ export function GlobalSearch({ className }: GlobalSearchProps) {
   }, [searchResults]);
 
   useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        openSearch();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [openSearch]);
+
+  useEffect(() => {
     if (isOpen && inputRef.current) {
       inputRef.current.focus();
     }
@@ -109,12 +120,12 @@ export function GlobalSearch({ className }: GlobalSearchProps) {
 
   return (
     <>
-      {/* Search Trigger */}
+      {/* Desktop Search Trigger */}
       <Button
         variant="ghost"
         onClick={openSearch}
         className={cn(
-          "flex items-center gap-2 text-muted-foreground hover:text-foreground",
+          "hidden md:flex items-center gap-2 text-muted-foreground hover:text-foreground",
           "w-64 justify-start px-3 py-2 h-9",
           "border border-input bg-background hover:bg-accent",
           className
@@ -124,10 +135,20 @@ export function GlobalSearch({ className }: GlobalSearchProps) {
         <span className="text-sm">Buscar...</span>
         <div className="ml-auto flex items-center gap-1">
           <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
-            <Command className="h-3 w-3" />
-            K
+            Ctrl K
           </kbd>
         </div>
+      </Button>
+
+      {/* Mobile Search Trigger */}
+      <Button
+        variant="outline"
+        size="icon"
+        onClick={openSearch}
+        className="md:hidden h-9 w-9"
+        title="Buscar"
+      >
+        <Search className="h-4 w-4" />
       </Button>
 
       {/* Search Dialog */}

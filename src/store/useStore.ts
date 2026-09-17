@@ -142,6 +142,19 @@ export const useStore = create<AppState>((set) => ({
   setCurrency: (currency) => set({ currency }),
 
   // Sidebar
-  sidebarOpen: true,
-  setSidebarOpen: (open) => set({ sidebarOpen: open }),
+  sidebarOpen: (() => {
+    try {
+      return localStorage.getItem('sidebar-open') !== 'false';
+    } catch {
+      return true;
+    }
+  })(),
+  setSidebarOpen: (open) => {
+    try {
+      localStorage.setItem('sidebar-open', open ? 'true' : 'false');
+    } catch {
+      /* ignore */
+    }
+    set({ sidebarOpen: open });
+  },
 }));

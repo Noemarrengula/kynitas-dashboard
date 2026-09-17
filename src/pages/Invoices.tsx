@@ -3,9 +3,11 @@ import { FileText, Search, XCircle, Printer, ChevronLeft, ChevronRight, FileSpre
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { PageHeader } from '@/components/ui/page-header';
+import { EmptyState } from '@/components/ui/empty-state';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { useInvoices } from '@/hooks/useInvoices';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useI18n } from '@/contexts/I18nContext';
@@ -20,10 +22,10 @@ const statusLabels: Record<string, string> = {
   cancelled: 'Cancelada',
 };
 
-const statusColors: Record<string, string> = {
-  draft: 'bg-yellow-100 text-yellow-800',
-  issued: 'bg-green-100 text-green-800',
-  cancelled: 'bg-red-100 text-red-800',
+const statusVariant: Record<string, 'success' | 'warning' | 'destructive' | 'neutral' | 'info'> = {
+  draft: 'warning',
+  issued: 'success',
+  cancelled: 'destructive',
 };
 
 const docTypeLabels: Record<string, string> = {
@@ -75,12 +77,10 @@ export default function Invoices() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">{t('nav.invoices')}</h1>
-          <p className="text-muted-foreground">{invoices.length} documentos</p>
-        </div>
-      </div>
+      <PageHeader
+        title={t('nav.invoices')}
+        description={`${invoices.length} documentos`}
+      />
 
       <div className="flex gap-4 items-center flex-wrap">
         <div className="relative flex-1 max-w-sm">
@@ -108,10 +108,12 @@ export default function Invoices() {
 
       {paginated.length === 0 ? (
         <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-            <p className="text-lg font-medium">Nenhuma factura encontrada</p>
-            <p className="text-sm text-muted-foreground">As facturas aparecerão aqui após emitidas nas vendas</p>
+          <CardContent>
+            <EmptyState
+              icon={FileText}
+              title="Nenhuma factura encontrada"
+              description="As facturas aparecerão aqui após serem emitidas nas vendas."
+            />
           </CardContent>
         </Card>
       ) : (
@@ -124,7 +126,9 @@ export default function Invoices() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-semibold">{docTypeLabels[invoice.documentType]}</span>
                       <span className="text-muted-foreground">{invoice.series}-{String(invoice.number).padStart(4, '0')}</span>
-                      <Badge className={statusColors[invoice.status]}>{statusLabels[invoice.status]}</Badge>
+                      <StatusBadge variant={statusVariant[invoice.status] ?? 'neutral'} dot>
+                          {statusLabels[invoice.status]}
+                        </StatusBadge>
                     </div>
                     <div className="text-sm text-muted-foreground">
                       {new Date(invoice.createdAt).toLocaleDateString('pt-MZ')}

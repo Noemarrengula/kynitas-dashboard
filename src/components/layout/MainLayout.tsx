@@ -34,7 +34,7 @@ export function MainLayout() {
       <Sidebar />
       <div className={cn(
         "transition-all duration-200",
-        sidebarOpen ? "md:ml-56" : "md:ml-16"
+        sidebarOpen ? "md:ml-[260px]" : "md:ml-20"
       )}>
         <Topbar />
         {(!online || pendingCount > 0) && (
@@ -55,8 +55,10 @@ export function MainLayout() {
             )}
           </div>
         )}
-        <main className="p-4 md:p-5 animate-fade-in">
-          <Outlet />
+        <main className="p-3 md:p-5 animate-fade-in">
+          <div className="mx-auto w-full max-w-[1440px]">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

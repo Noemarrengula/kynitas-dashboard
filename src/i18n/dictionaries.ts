@@ -29,6 +29,19 @@ const pt: Dictionary = {
   'nav.settings': 'Configurações',
   'nav.logout': 'Sair',
 
+  // Módulos da navegação
+  'nav.section.command': 'Centro de comando',
+  'nav.section.operations': 'Operações',
+  'nav.section.inventory': 'Inventário',
+  'nav.section.customers': 'Clientes',
+  'nav.section.finance': 'Financeiro',
+  'nav.section.intelligence': 'Inteligência',
+  'nav.section.admin': 'Administração',
+  'nav.products': 'Produtos',
+  'nav.movements': 'Movimentos',
+  'nav.creditsManagment': 'Gestão de Créditos',
+  'nav.users': 'Utilizadores',
+
   // Topbar
   'topbar.search': 'Pesquisar...',
   'topbar.selectBusiness': 'Selecionar',
@@ -36,6 +49,10 @@ const pt: Dictionary = {
   'topbar.user': 'Utilizador',
   'topbar.confirmLogoutTitle': 'Confirmar saída',
   'topbar.confirmLogoutDescription': 'Tem a certeza que deseja sair?',
+  'topbar.online': 'Online',
+  'topbar.offline': 'Offline',
+  'topbar.myProfile': 'Meu perfil',
+  'topbar.preferences': 'Preferências',
 
   // Roles
   'role.admin': 'Administrador',
@@ -120,13 +137,30 @@ const en: Dictionary = {
   'nav.settings': 'Settings',
   'nav.logout': 'Log out',
 
+  // Navigation modules
+  'nav.section.command': 'Command center',
+  'nav.section.operations': 'Operations',
+  'nav.section.inventory': 'Inventory',
+  'nav.section.customers': 'Customers',
+  'nav.section.finance': 'Financial',
+  'nav.section.intelligence': 'Intelligence',
+  'nav.section.admin': 'Administration',
+  'nav.products': 'Products',
+  'nav.movements': 'Movements',
+  'nav.creditsManagment': 'Credits Management',
+  'nav.users': 'Users',
+
   // Topbar
   'topbar.search': 'Search...',
   'topbar.selectBusiness': 'Select',
   'topbar.selectBar': 'Select Bar',
-  'topbar.user': 'User',
-  'topbar.confirmLogoutTitle': 'Confirm log out',
+'topbar.user': 'User',
+  'topbar.confirmLogoutTitle': 'Confirm logout',
   'topbar.confirmLogoutDescription': 'Are you sure you want to log out?',
+  'topbar.online': 'Online',
+  'topbar.offline': 'Offline',
+  'topbar.myProfile': 'My profile',
+  'topbar.preferences': 'Preferences',
 
   // Roles
   'role.admin': 'Administrator',

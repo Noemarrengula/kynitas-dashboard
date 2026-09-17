@@ -1,10 +1,21 @@
-import { Search, User, Menu, LogOut, Building2, Check, Languages } from 'lucide-react';
+import {
+  Building2,
+  Check,
+  ChevronDown,
+  Languages,
+  LogOut,
+  Menu,
+  Settings,
+  UserCircle2,
+  Wifi,
+  WifiOff,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useI18n } from '@/contexts/I18nContext';
 import { usePermissions, ROLE_LABELS } from '@/hooks/usePermissions';
+import { useOfflineSync } from '@/hooks/useOfflineSync';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,20 +27,51 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { cn } from '@/lib/utils';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ThemeToggle } from '@/components/providers/ThemeToggle';
 import { NotificationCenter } from './NotificationCenter';
+import { GlobalSearch } from '@/components/GlobalSearch';
 import { useStore } from '@/store/useStore';
 import { ALLOWED_LANGUAGES, type Language } from '@/i18n/dictionaries';
+
+function OnlineStatus() {
+  const { online, pendingCount } = useOfflineSync();
+  const { t } = useI18n();
+
+  return (
+    <div
+      className={cn(
+        "hidden md:flex items-center gap-1.5 rounded-full border px-2.5 py-1",
+        online
+          ? "border-success/30 bg-success/10 text-success"
+          : "border-destructive/30 bg-destructive/10 text-destructive"
+      )}
+      title={online ? t('topbar.online') : t('topbar.offline')}
+    >
+      {online ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
+      <span className="text-xs font-medium">{online ? t('topbar.online') : t('topbar.offline')}</span>
+      {pendingCount > 0 && (
+        <Badge
+          variant="secondary"
+          className="h-4 min-w-4 px-1 text-[9px] font-bold tabular-nums"
+        >
+          {pendingCount}
+        </Badge>
+      )}
+    </div>
+  );
+}
 
 export function Topbar() {
   const { user, signOut } = useAuth();
   const { currentBusiness, businesses, switchBusiness } = useBusiness();
-  const { role } = usePermissions();
+  const { role, can } = usePermissions();
   const { language, setLanguage, t } = useI18n();
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const { sidebarOpen, setSidebarOpen } = useStore();
-  const criticalStockCount = 0; // TODO: Get from database
+  const navigate = useNavigate();
 
   const LANG_LABELS: Record<Language, string> = {
     pt: t('lang.pt'),
@@ -46,8 +88,8 @@ export function Topbar() {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4">
-      <div className="flex items-center gap-3 min-w-0">
+    <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-3 md:px-4 gap-2">
+      <div className="flex items-center gap-2 min-w-0 flex-1">
         <Button
           variant="ghost"
           size="icon"
@@ -57,24 +99,21 @@ export function Topbar() {
           <Menu className="h-5 w-5" />
         </Button>
 
-        <div className="relative flex-1 max-w-md min-w-0 hidden sm:block">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            type="search"
-            placeholder={t('topbar.search')}
-            className="pl-10 bg-muted/50 border-0 focus-visible:ring-1 h-9 text-sm w-full"
-          />
-        </div>
+        <GlobalSearch />
       </div>
 
       <div className="flex items-center gap-1.5 shrink-0">
+        {/* Estado Online/Offline */}
+        <OnlineStatus />
+
         {/* Business Selector */}
-        {businesses.length > 1 && (
+        {businesses.length > 1 && currentBusiness && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="gap-2 h-9">
                 <Building2 className="h-4 w-4" />
-                <span className="hidden sm:inline text-sm">{currentBusiness?.name || t('topbar.selectBusiness')}</span>
+                <span className="hidden sm:inline text-sm max-w-40 truncate">{currentBusiness.name}</span>
+                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
@@ -86,9 +125,9 @@ export function Topbar() {
                   onClick={() => switchBusiness(b.id)}
                   className="flex items-center justify-between"
                 >
-                  <span className="text-sm">{b.name}</span>
+                  <span className="text-sm truncate">{b.name}</span>
                   {b.id === currentBusiness?.id && (
-                    <Check className="h-4 w-4 text-primary" />
+                    <Check className="h-4 w-4 text-primary shrink-0" />
                   )}
                 </DropdownMenuItem>
               ))}
@@ -101,7 +140,7 @@ export function Topbar() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm" className="gap-2 h-9 px-2.5" title={t('settings.language')}>
               <Languages className="h-4 w-4" />
-              <span className="hidden sm:inline text-sm uppercase">{language}</span>
+              <span className="hidden uppercase text-xs font-semibold tracking-wide">{language}</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44">
@@ -120,18 +159,18 @@ export function Topbar() {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* Role Badge */}
-        {role && (
-          <Badge variant={roleVariant()} className="hidden sm:inline-flex text-xs">
-            {t(`role.${role}`) || ROLE_LABELS[role] || role}
-          </Badge>
-        )}
+        {/* Notifications */}
+        <NotificationCenter />
 
         {/* Theme Toggle */}
         <ThemeToggle />
 
-        {/* Notifications */}
-        <NotificationCenter />
+        {/* Role Badge */}
+        {role && (
+          <Badge variant={roleVariant()} className="hidden lg:inline-flex text-xs">
+            {t(`role.${role}`) || ROLE_LABELS[role] || role}
+          </Badge>
+        )}
 
         {/* User Menu */}
         <DropdownMenu>
@@ -145,15 +184,31 @@ export function Topbar() {
               </Avatar>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuContent align="end" className="w-60">
             <DropdownMenuLabel className="text-xs">
-              <div className="flex flex-col">
+              <div className="flex flex-col gap-0.5">
                 <span className="font-medium">{user?.user_metadata?.name || t('topbar.user')}</span>
-                <span className="text-muted-foreground font-normal">{user?.email}</span>
+                <span className="text-muted-foreground font-normal truncate">{user?.email}</span>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-xs" onClick={() => setShowLogoutDialog(true)}>
+            {can('configuracoes') && (
+              <>
+                <DropdownMenuItem className="text-xs" onClick={() => navigate('/settings')}>
+                  <UserCircle2 className="h-4 w-4 mr-2" />
+                  {t('topbar.myProfile')}
+                </DropdownMenuItem>
+                <DropdownMenuItem className="text-xs" onClick={() => navigate('/settings')}>
+                  <Settings className="h-4 w-4 mr-2" />
+                  {t('topbar.preferences')}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
+            )}
+            <DropdownMenuItem
+              className="text-xs text-destructive focus:text-destructive"
+              onClick={() => setShowLogoutDialog(true)}
+            >
               <LogOut className="h-4 w-4 mr-2" />
               {t('nav.logout')}
             </DropdownMenuItem>
