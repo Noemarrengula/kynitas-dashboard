@@ -118,7 +118,11 @@ export function useInvoices() {
 
       const seriesList = useStore.getState().invoiceSeries;
       const series = seriesList.find(s => s.documentType === documentType && s.active);
-      if (!series) return { data: null, error: `Nenhuma série ativa para ${documentType}` };
+      if (!series) {
+        const message = `Nenhuma série ativa para ${documentType}. Configure as séries de faturação.`;
+        toast({ title: 'Erro ao emitir fatura', description: message, variant: 'destructive' });
+        return { data: null, error: message };
+      }
 
       const nextNumber = series.currentNumber + 1;
 

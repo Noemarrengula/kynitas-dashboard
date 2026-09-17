@@ -70,7 +70,7 @@ const CustomerModal = memo(function CustomerModal({ open, onClose, onSave, custo
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{customer ? 'Editar Cliente' : 'Novo Cliente'}</DialogTitle>
         </DialogHeader>

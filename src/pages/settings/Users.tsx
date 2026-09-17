@@ -179,7 +179,7 @@ export default function UsersPage() {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="list-panel overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-xs font-medium text-muted-foreground border-b">

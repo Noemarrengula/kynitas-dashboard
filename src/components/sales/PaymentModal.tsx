@@ -110,7 +110,7 @@ const PaymentModal = memo(function PaymentModal({ open, onClose, totalAmount, on
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && handleClose()} modal>
-      <DialogContent className="sm:max-w-md" aria-describedby="payment-description">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto" aria-describedby="payment-description">
         <DialogHeader>
           <DialogTitle>Registar Pagamento</DialogTitle>
         </DialogHeader>

@@ -247,7 +247,7 @@ export default function Customers() {
       </div>
 
       {/* Customers Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="list-panel grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredCustomers.map((customer) => (
           <div key={customer.id} className="bg-card border rounded-xl p-4 space-y-3">
             <div className="flex items-start justify-between">

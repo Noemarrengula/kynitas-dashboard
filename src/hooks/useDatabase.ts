@@ -542,25 +542,36 @@ export function useDatabase() {
 
       const nextSaleNumber = (count || 0) + 1;
 
+      // Só envia colunas opcionais se tiverem valor, evitando 400 PGRST204
+      // quando a coluna ainda não existe no schema da tabela sales.
+      const insertData: Record<string, unknown> = {
+        business_id: currentBusiness.id,
+        sale_number: nextSaleNumber,
+        items: sale.items,
+        total: sale.total,
+        payment_details: sale.paymentDetails || {},
+      };
+      if (sale.tableId) insertData.table_id = sale.tableId;
+      if (sale.table_number != null) insertData.table_number = sale.table_number;
+      if (sale.table_name) insertData.table_name = sale.table_name;
+      if (sale.table_customer_name) insertData.table_customer_name = sale.table_customer_name;
+      if (sale.customerId) insertData.customer_id = sale.customerId;
+
       const { data, error } = await supabase
         .from('sales')
-        .insert({
-          business_id: currentBusiness.id,
-          sale_number: nextSaleNumber,
-          items: sale.items,
-          total: sale.total,
-          payment_details: sale.paymentDetails || {},
-          table_id: sale.tableId || null,
-          table_number: sale.table_number || null,
-          table_name: sale.table_name || null,
-          table_customer_name: sale.table_customer_name || null,
-          customer_id: sale.customerId || null,
-        })
+        .insert(insertData)
         .select()
         .single();
 
       if (error) {
         console.error('[ADD_SALE] Erro na inserção:', error);
+        console.error('[ADD_SALE] Detalhes:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          customerId: sale.customerId ?? null,
+        });
         if (isNetworkError(error.message)) {
           return saveSaleOffline(sale);
         }

@@ -51,7 +51,7 @@ const PaymentModal = memo(function PaymentModal({ open, onClose, onSave, custome
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Receber Pagamento</DialogTitle>
         </DialogHeader>

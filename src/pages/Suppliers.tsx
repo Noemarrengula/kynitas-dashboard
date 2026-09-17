@@ -126,7 +126,7 @@ export default function Suppliers() {
             onChange={(e) => setSearch(e.target.value)}
           />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="list-panel grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredSuppliers.map((supplier) => {
               const stats = getSupplierStats(supplier.id);
               return (

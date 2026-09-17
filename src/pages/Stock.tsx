@@ -335,7 +335,7 @@ export default function Stock() {
       </div>
 
       {/* Table */}
-      <div className="bg-card border rounded-xl overflow-hidden">
+      <div className="list-panel border rounded-xl overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>

@@ -538,7 +538,7 @@ export default function Reports() {
       </div>
 
       {/* Sales History Table */}
-      <div className="bg-card border rounded-xl p-6 animate-slide-up">
+      <div className="list-panel border rounded-xl p-6 animate-slide-up">
         <h3 className="text-lg font-semibold mb-4">Histórico de Vendas</h3>
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -651,7 +651,7 @@ export default function Reports() {
       </div>
 
       {/* Credits History Table */}
-      <div className="bg-card border rounded-xl p-6 animate-slide-up">
+      <div className="list-panel border rounded-xl p-6 animate-slide-up">
         <h3 className="text-lg font-semibold mb-4">Histórico de Créditos</h3>
         <div className="overflow-x-auto">
           <table className="w-full">

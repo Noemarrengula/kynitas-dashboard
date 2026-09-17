@@ -635,7 +635,7 @@ export default function Sales() {
         </div>
 
         {/* Order Summary */}
-        <div className="bg-card border rounded-xl p-6 h-fit sticky top-24">
+        <div className="list-panel border rounded-xl p-6 h-fit sticky top-24">
           <h3 className="font-semibold text-lg mb-4">Resumo da Venda</h3>
 
           {orderItems.length === 0 ? (
@@ -880,7 +880,8 @@ export default function Sales() {
             <Button variant="outline" onClick={() => setShowInvoiceDialog(false)}>Cancelar</Button>
             <Button onClick={async () => {
               if (!lastSaleId) return;
-              await issueInvoice(lastSaleId, selectedDocType);
+              const result = await issueInvoice(lastSaleId, selectedDocType);
+              if (result.error) return;
               setShowInvoiceDialog(false);
               setLastSaleId(null);
             }}>

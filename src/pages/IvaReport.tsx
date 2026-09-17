@@ -129,7 +129,7 @@ export default function IvaReport() {
         </Card>
       </div>
 
-      <Card>
+      <Card className="list-panel">
         <CardHeader>
           <CardTitle>Distribuição por Taxa de IVA</CardTitle>
         </CardHeader>

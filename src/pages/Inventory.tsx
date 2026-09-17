@@ -289,7 +289,7 @@ export default function Inventory() {
       />
 
       {/* Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="list-panel grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredIngredients.map((ingredient) => {
           const isCritical = ingredient.stock <= ingredient.minStock;
           const percentage = (ingredient.stock / (ingredient.minStock * 2)) * 100;
@@ -434,7 +434,7 @@ export default function Inventory() {
 
       {/* Create Ingredient Dialog */}
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Novo Ingrediente</DialogTitle>
           </DialogHeader>

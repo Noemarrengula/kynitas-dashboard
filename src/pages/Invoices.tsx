@@ -115,7 +115,7 @@ export default function Invoices() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
+        <div className="list-panel space-y-3">
           {paginated.map(invoice => (
             <Card key={invoice.id}>
               <CardContent className="p-4">

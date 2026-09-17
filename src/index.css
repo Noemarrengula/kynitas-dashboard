@@ -256,6 +256,25 @@
   .sidebar-expanded {
     width: 220px;
   }
+
+  /* Listas/áreas de dados com fundo preto */
+  .list-panel {
+    --background: 0 0% 0%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 0%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 10%;
+    --popover-foreground: 0 0% 98%;
+    --secondary: 0 0% 12%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 12%;
+    --muted-foreground: 0 0% 60%;
+    --accent: 0 0% 14%;
+    --accent-foreground: 0 0% 98%;
+    --border: 0 0% 18%;
+    --input: 0 0% 18%;
+    background-color: hsl(0, 0%, 0%);
+  }
 }
 
 @keyframes fadeIn {

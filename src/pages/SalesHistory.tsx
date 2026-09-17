@@ -266,7 +266,7 @@ export default function SalesHistory() {
         </div>
       </div>
 
-      <div className="bg-card border rounded-xl overflow-hidden">
+      <div className="list-panel border rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-muted/50">
