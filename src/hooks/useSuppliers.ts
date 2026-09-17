@@ -15,18 +15,6 @@ export function useSuppliers() {
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (currentBusiness?.id) {
-      loadAll();
-    }
-  }, [currentBusiness?.id]);
-
-  const loadAll = useCallback(async () => {
-    setLoading(true);
-    await Promise.all([fetchSuppliers(), fetchPurchaseOrders()]);
-    setLoading(false);
-  }, [fetchSuppliers, fetchPurchaseOrders]);
-
   const fetchSuppliers = useCallback(async () => {
     if (!currentBusiness?.id) return;
 
@@ -60,6 +48,18 @@ export function useSuppliers() {
       }
     } catch (err) {
       console.error('Erro ao buscar ordens de compra:', err);
+    }
+  }, [currentBusiness?.id]);
+
+  const loadAll = useCallback(async () => {
+    setLoading(true);
+    await Promise.all([fetchSuppliers(), fetchPurchaseOrders()]);
+    setLoading(false);
+  }, [fetchSuppliers, fetchPurchaseOrders]);
+
+  useEffect(() => {
+    if (currentBusiness?.id) {
+      loadAll();
     }
   }, [currentBusiness?.id]);
 

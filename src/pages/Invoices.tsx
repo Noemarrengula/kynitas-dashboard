@@ -8,6 +8,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { useInvoices } from '@/hooks/useInvoices';
 import { useBusiness } from '@/contexts/BusinessContext';
+import { useI18n } from '@/contexts/I18nContext';
 import { printInvoice } from '@/lib/invoice';
 import { InvoiceA4 } from '@/components/invoice/InvoiceA4';
 import { Invoice, DocumentType } from '@/types';
@@ -37,6 +38,7 @@ const ITEMS_PER_PAGE = 20;
 export default function Invoices() {
   const { invoices, loading, cancelInvoice, reprintInvoice } = useInvoices();
   const { business } = useBusiness();
+  const { t } = useI18n();
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [page, setPage] = useState(1);
@@ -75,12 +77,12 @@ export default function Invoices() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Facturas</h1>
+          <h1 className="text-2xl font-bold">{t('nav.invoices')}</h1>
           <p className="text-muted-foreground">{invoices.length} documentos</p>
         </div>
       </div>
 
-      <div className="flex gap-4 items-center">
+      <div className="flex gap-4 items-center flex-wrap">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -119,7 +121,7 @@ export default function Invoices() {
               <CardContent className="p-4">
                 <div className="flex items-start justify-between">
                   <div className="space-y-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-semibold">{docTypeLabels[invoice.documentType]}</span>
                       <span className="text-muted-foreground">{invoice.series}-{String(invoice.number).padStart(4, '0')}</span>
                       <Badge className={statusColors[invoice.status]}>{statusLabels[invoice.status]}</Badge>
@@ -138,7 +140,7 @@ export default function Invoices() {
                     <div className="text-xs text-muted-foreground">IVA: {formatCurrency(invoice.ivaAmount)}</div>
                   </div>
                 </div>
-                <div className="flex gap-2 mt-3 pt-3 border-t">
+                <div className="flex gap-2 mt-3 pt-3 border-t flex-wrap">
                   <Button variant="outline" size="sm" onClick={async () => {
                     const result = await reprintInvoice(invoice.id);
                     if (result.data) printInvoice(result.data, business);

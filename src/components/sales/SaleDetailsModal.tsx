@@ -208,5 +208,5 @@ const SaleDetailsModal = memo(function SaleDetailsModal({ sale, open, onClose }:
       </DialogContent>
     </Dialog>
   );
-};
+});
 export { SaleDetailsModal };

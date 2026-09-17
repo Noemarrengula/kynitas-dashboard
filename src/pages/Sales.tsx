@@ -5,12 +5,14 @@ import { useDatabase } from '@/hooks/useDatabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { PageHeader } from '@/components/ui/page-header';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { OrderItem, Product } from '@/types';
 import { toast } from '@/hooks/use-toast';
 import { cn, getErrorMessage, formatCurrency } from '@/lib/utils';
 import { useBusiness } from '@/contexts/BusinessContext';
+import { useI18n } from '@/contexts/I18nContext';
 import { sanitizeSaleData, sanitizeSearchQuery } from '@/lib/sanitize';
 import { useCashDrawer } from '@/hooks/useCashDrawer';
 import { useCredits } from '@/hooks/useCredits';
@@ -23,6 +25,7 @@ export default function Sales() {
   const { open: openCashDrawer } = useCashDrawer();
   const { registerCreditCharge } = useCredits();
   const { issueInvoice, invoiceSeries } = useInvoices();
+  const { t } = useI18n();
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [lastSaleId, setLastSaleId] = useState<string | null>(null);
   const [showInvoiceDialog, setShowInvoiceDialog] = useState(false);
@@ -280,6 +283,7 @@ export default function Sales() {
           total: totalReceived,
           change: Math.max(0, change),
         },
+        customerId: payment.customerId,
         createdAt: new Date(),
       };
 
@@ -457,7 +461,7 @@ export default function Sales() {
     }
   }, [orderItems, generatePreBillHTML]);
 
-  const generatePreBillHTML = useCallback(() => {
+  function generatePreBillHTML() {
     const formatCurrency = (value: number) => `${value.toFixed(2)} MT`;
     const centerText = (text: string, width = 48) => {
       const padding = Math.max(0, Math.floor((width - text.length) / 2));
@@ -577,18 +581,16 @@ export default function Sales() {
         </head>
         <body><pre><strong>${bill.join('\n')}</strong></pre></body>
       </html>`;
-  }, [business, orderItems, total]);
+  }
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <ShoppingCart className="h-6 w-6 text-primary" />
-          Registo de Vendas
-        </h1>
-        <p className="text-muted-foreground">Realizar vendas directas</p>
-      </div>
+      <PageHeader
+        icon={<ShoppingCart className="h-6 w-6" />}
+        title={t('nav.sales')}
+        description="Realizar vendas directas"
+      />
 
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Products */}
@@ -667,7 +669,7 @@ export default function Sales() {
                 max="100"
                 value={discountPercent || ''}
                 onChange={e => setDiscountPercent(Math.min(100, Math.max(0, Number(e.target.value) || 0)))}
-                className="w-20 h-8 text-sm text-right"
+                className="w-24 h-8 text-sm text-right"
               />
             </div>
             {discountPercent > 0 && (

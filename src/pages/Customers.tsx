@@ -1,13 +1,18 @@
 import { useState, useEffect } from 'react';
-import { Users, Plus, Search, Gift, Phone, Mail, Calendar, TrendingUp, Loader2 } from 'lucide-react';
+import { Users, Plus, Search, Gift, Phone, Mail, Calendar, TrendingUp, Loader2, History, Coins } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { PageHeader } from '@/components/ui/page-header';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useBusiness } from '@/contexts/BusinessContext';
+import { useI18n } from '@/contexts/I18nContext';
 import { formatCurrency } from '@/lib/utils';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
+import { toast } from '@/hooks/use-toast';
 import CustomerModal from '@/components/customers/CustomerModal';
 
 interface Customer {
@@ -22,12 +27,29 @@ interface Customer {
   last_visit_at?: string;
 }
 
+interface LoyaltyTx {
+  id: string;
+  points: number;
+  type: 'earn' | 'redeem' | 'bonus';
+  description?: string;
+  created_at: string;
+}
+
 export default function Customers() {
   const { business } = useBusiness();
+  const { t } = useI18n();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+
+  // Detalhe de pontos de um cliente
+  const [detailCustomer, setDetailCustomer] = useState<Customer | null>(null);
+  const [loyaltyHistory, setLoyaltyHistory] = useState<LoyaltyTx[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [redeemPoints, setRedeemPoints] = useState('');
+  const [bonusPoints, setBonusPoints] = useState('');
+  const [mutating, setMutating] = useState(false);
 
   useEffect(() => {
     loadCustomers();
@@ -63,6 +85,91 @@ export default function Customers() {
     c.phone.includes(search)
   );
 
+  const openDetail = async (customer: Customer) => {
+    setDetailCustomer(customer);
+    setLoyaltyHistory([]);
+    setRedeemPoints('');
+    setBonusPoints('');
+    setHistoryLoading(true);
+    try {
+      if (isSupabaseConfigured()) {
+        const { data } = await supabase
+          .from('loyalty_transactions')
+          .select('*')
+          .eq('customer_id', customer.id)
+          .order('created_at', { ascending: false })
+          .limit(50);
+        setLoyaltyHistory(data || []);
+      }
+    } catch (err) {
+      console.error('Erro ao carregar histórico de pontos:', err);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const refreshCustomerPoints = (customerId: string, points: number) => {
+    setCustomers(prev => prev.map(c => c.id === customerId ? { ...c, loyalty_points: points } : c));
+    setDetailCustomer(prev => prev ? { ...prev, loyalty_points: points } : prev);
+  };
+
+  const handleRedeem = async () => {
+    const points = parseFloat(redeemPoints);
+    if (!detailCustomer || !points || points <= 0) {
+      toast({ title: 'Pontos inválidos', description: 'Indique uma quantidade de pontos válida', variant: 'destructive' });
+      return;
+    }
+    setMutating(true);
+    try {
+      if (!isSupabaseConfigured()) throw new Error('Supabase não configurado');
+      const { data, error } = await supabase.rpc('redeem_loyalty_points', {
+        p_customer: detailCustomer.id,
+        p_points: Math.floor(points),
+      });
+      if (error) throw error;
+      const result = data as { ok: boolean; msg?: string; remaining?: number; discount?: number };
+      if (!result.ok) {
+        toast({ title: 'Não foi possível resgatar', description: result.msg || 'Erro desconhecido', variant: 'destructive' });
+        return;
+      }
+      toast({
+        title: 'Pontos resgatados!',
+        description: `Desconto de ${result.discount} MT · saldo ${result.remaining} pts`,
+      });
+      refreshCustomerPoints(detailCustomer.id, result.remaining ?? 0);
+      await openDetail(detailCustomer);
+    } catch (err) {
+      console.error('Erro ao resgatar pontos:', err);
+      toast({ title: 'Erro ao resgatar pontos', description: 'Tente novamente', variant: 'destructive' });
+    } finally {
+      setMutating(false);
+    }
+  };
+
+  const handleBonus = async () => {
+    const points = parseFloat(bonusPoints);
+    if (!detailCustomer || !points || points <= 0) {
+      toast({ title: 'Pontos inválidos', description: 'Indique uma quantidade de pontos válida', variant: 'destructive' });
+      return;
+    }
+    setMutating(true);
+    try {
+      if (!isSupabaseConfigured()) throw new Error('Supabase não configurado');
+      const { error } = await supabase.rpc('add_bonus_points', {
+        p_customer: detailCustomer.id,
+        p_points: Math.floor(points),
+      });
+      if (error) throw error;
+      toast({ title: 'Bónus adicionado', description: `${Math.floor(points)} pontos creditados` });
+      await openDetail(detailCustomer);
+    } catch (err) {
+      console.error('Erro ao adicionar bónus:', err);
+      toast({ title: 'Erro ao adicionar bónus', description: 'Tente novamente', variant: 'destructive' });
+    } finally {
+      setMutating(false);
+    }
+  };
+
   const totalCustomers = customers.length;
   const totalPoints = customers.reduce((acc, c) => acc + c.loyalty_points, 0);
   const totalRevenue = customers.reduce((acc, c) => acc + c.total_spent, 0);
@@ -78,19 +185,16 @@ export default function Customers() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Users className="h-6 w-6 text-primary" />
-            Clientes
-          </h1>
-          <p className="text-muted-foreground">Gestão de clientes e programa de fidelidade</p>
-        </div>
+      <PageHeader
+        icon={<Users className="h-6 w-6" />}
+        title={t('nav.customers')}
+        description="Gestão de clientes e programa de fidelidade"
+      >
         <Button onClick={() => setDialogOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
           Novo Cliente
         </Button>
-      </div>
+      </PageHeader>
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -189,6 +293,11 @@ export default function Customers() {
                 {format(new Date(customer.birth_date), 'dd/MM', { locale: pt })}
               </div>
             )}
+
+            <Button variant="outline" size="sm" className="w-full mt-1" onClick={() => openDetail(customer)}>
+              <History className="h-3.5 w-3.5 mr-1" />
+              Histórico de Pontos
+            </Button>
           </div>
         ))}
       </div>
@@ -205,6 +314,89 @@ export default function Customers() {
         onOpenChange={setDialogOpen}
         onSuccess={loadCustomers}
       />
+
+      {/* Loyalty Detail Dialog */}
+      <Dialog open={!!detailCustomer} onOpenChange={(open) => !open && setDetailCustomer(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Coins className="h-5 w-5 text-primary" />
+              {detailCustomer?.name}
+            </DialogTitle>
+            <DialogDescription>
+              {detailCustomer?.phone} · {detailCustomer?.loyalty_points} pontos disponíveis
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Resgatar pontos (1 pt = 1 MT)</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    min="1"
+                    placeholder="Pontos"
+                    value={redeemPoints}
+                    onChange={(e) => setRedeemPoints(e.target.value)}
+                  />
+                  <Button variant="gradient" onClick={handleRedeem} disabled={mutating} className="shrink-0">
+                    {mutating ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Resgatar'}
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Adicionar bónus</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    min="1"
+                    placeholder="Pontos"
+                    value={bonusPoints}
+                    onChange={(e) => setBonusPoints(e.target.value)}
+                  />
+                  <Button onClick={handleBonus} disabled={mutating} className="shrink-0">
+                    + Bonus
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {historyLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : loyaltyHistory.length === 0 ? (
+              <p className="text-center py-6 text-sm text-muted-foreground">
+                Sem movimentos de pontos ainda. Associos clientes ao registar vendas no PDV.
+              </p>
+            ) : (
+              <div className="border rounded-lg divide-y max-h-64 overflow-y-auto">
+                {loyaltyHistory.map(tx => (
+                  <div key={tx.id} className="flex items-center justify-between px-3 py-2 text-sm">
+                    <div className="flex items-center gap-2">
+                      <Badge variant={tx.points < 0 ? 'destructive' : 'secondary'}>
+                        {tx.points > 0 ? `+${tx.points}` : tx.points} pts
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {tx.type === 'earn' ? 'Compra' : tx.type === 'bonus' ? 'Bónus' : 'Resgate'}
+                        {tx.description ? ` · ${tx.description}` : ''}
+                      </span>
+                    </div>
+                    <span className="text-xs text-muted-foreground shrink-0 ml-2">
+                      {format(new Date(tx.created_at), 'dd/MM/yyyy', { locale: pt })}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDetailCustomer(null)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

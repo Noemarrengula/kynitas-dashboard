@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePermissions, ROLE_LABELS } from '@/hooks/usePermissions';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { getErrorMessage } from '@/lib/utils';
@@ -41,6 +42,7 @@ interface BusinessUser {
 export function CentralAdminPanel() {
   const { currentBusinessUser } = useBusiness();
   const { user } = useAuth();
+  const { isAdmin } = usePermissions();
   const { toast } = useToast();
   
   const [businessStats, setBusinessStats] = useState<BusinessStats[]>([]);
@@ -48,15 +50,12 @@ export function CentralAdminPanel() {
   const [loading, setLoading] = useState(true);
   const [selectedBusiness, setSelectedBusiness] = useState<string | null>(null);
 
-  // Verificar se é super admin
-  const isSuperAdmin = currentBusinessUser?.role === 'super_admin';
-
   useEffect(() => {
-    if (isSuperAdmin) {
+    if (isAdmin) {
       loadBusinessStats();
       loadAllUsers();
     }
-  }, [isSuperAdmin]);
+  }, [isAdmin]);
 
   const loadBusinessStats = async () => {
     try {
@@ -211,12 +210,12 @@ export function CentralAdminPanel() {
     }
   };
 
-  if (!isSuperAdmin) {
+  if (!isAdmin) {
     return (
       <Alert>
         <Crown className="h-4 w-4" />
         <AlertDescription>
-          Acesso restrito a Super Administradores. Você precisa de permissões especiais para acessar esta área.
+          Acesso restrito a Administradores. Você precisa de permissões de administrador para acessar esta área.
         </AlertDescription>
       </Alert>
     );
@@ -240,7 +239,7 @@ export function CentralAdminPanel() {
         <div className="flex items-center gap-2">
           <Crown className="h-6 w-6 text-yellow-500" />
           <h1 className="text-2xl font-bold">Administração Central</h1>
-          <Badge variant="secondary">Super Admin</Badge>
+          <Badge variant="secondary">{currentBusinessUser?.role ? ROLE_LABELS[currentBusinessUser.role] : 'Administrador'}</Badge>
         </div>
         <Button>
           <Plus className="h-4 w-4 mr-2" />
@@ -417,12 +416,10 @@ export function CentralAdminPanel() {
                       <TableCell>{user.email}</TableCell>
                       <TableCell>{user.business_name}</TableCell>
                       <TableCell>
-                        <Badge variant={user.role === 'super_admin' ? 'default' : 'secondary'}>
-                          {user.role === 'super_admin' && <Crown className="h-3 w-3 mr-1" />}
-                          {user.role === 'super_admin' ? 'Super Admin' :
-                           user.role === 'owner' ? 'Proprietário' :
-                           user.role === 'manager' ? 'Gerente' : 'Staff'}
-                        </Badge>
+                        <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
+  {user.role === 'admin' && <Crown className="h-3 w-3 mr-1" />}
+  {ROLE_LABELS[user.role as 'admin' | 'supervisor' | 'caixa'] || user.role}
+</Badge>
                       </TableCell>
                       <TableCell>
                         <Badge variant={user.active ? 'default' : 'secondary'}>
@@ -441,7 +438,7 @@ export function CentralAdminPanel() {
                             size="sm"
                             variant={user.active ? "destructive" : "default"}
                             onClick={() => toggleUserStatus(user.id, !user.active)}
-                            disabled={user.role === 'super_admin'}
+                            disabled={user.role === 'admin'}
                           >
                             {user.active ? 'Desativar' : 'Ativar'}
                           </Button>

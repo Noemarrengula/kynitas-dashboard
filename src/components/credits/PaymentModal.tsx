@@ -144,5 +144,5 @@ const PaymentModal = memo(function PaymentModal({ open, onClose, onSave, custome
       </DialogContent>
     </Dialog>
   );
-};
+});
 export { PaymentModal };

@@ -8,6 +8,7 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { Pagination } from '@/components/Pagination';
 import { usePagination } from '@/hooks/usePagination';
 import { useBusiness } from '@/contexts/BusinessContext';
+import { useI18n } from '@/contexts/I18nContext';
 import { supabase } from '@/lib/supabase';
 import type { AuditEntry } from '@/hooks/useAuditLog';
 
@@ -36,19 +37,18 @@ const entityLabels: Record<string, string> = {
 
 export default function Audit() {
   const { currentBusiness } = useBusiness();
+  const { t } = useI18n();
   const [logs, setLogs] = useState<AuditEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [entityFilter, setEntityFilter] = useState('all');
   const [actionFilter, setActionFilter] = useState('all');
 
-  const pagination = usePagination({ data: logs, pageSize: 20 });
-
   const loadLogs = async () => {
     if (!currentBusiness?.id) return;
     setLoading(true);
     try {
-      let query = supabase
+      const query = supabase
         .from('audit_logs')
         .select('*')
         .eq('business_id', currentBusiness.id)
@@ -90,7 +90,7 @@ export default function Audit() {
     return true;
   });
 
-  pagination.setData(filtered);
+  const pagination = usePagination(filtered, 20);
 
   if (loading) return <LoadingSpinner />;
 
@@ -98,7 +98,7 @@ export default function Audit() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Auditoria</h1>
+          <h1 className="text-2xl font-bold">{t('nav.audit')}</h1>
           <p className="text-muted-foreground">Registo de actividades do sistema</p>
         </div>
         <Button variant="outline" onClick={loadLogs}>
@@ -142,7 +142,7 @@ export default function Audit() {
           ) : (
             <>
               <div className="space-y-1">
-                {pagination.pageData.map(log => (
+                {pagination.paginatedItems.map(log => (
                   <div key={log.id} className="flex items-start gap-3 p-3 rounded-lg hover:bg-muted/50 text-sm">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -176,7 +176,7 @@ export default function Audit() {
               <Pagination
                 currentPage={pagination.currentPage}
                 totalPages={pagination.totalPages}
-                onPageChange={pagination.goToPage}
+                onPageChange={pagination.handlePageChange}
               />
             </>
           )}

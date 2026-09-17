@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { useDatabase } from '@/hooks/useDatabase';
 import { useBusiness } from '@/contexts/BusinessContext';
+import { useI18n } from '@/contexts/I18nContext';
 import { listBackups, downloadBackup as dlBackup } from '@/hooks/useAutoBackup';
 import { exportTableData } from '@/lib/exportData';
 import { useStore } from '@/store/useStore';
@@ -33,6 +34,7 @@ export default function Backup() {
   const { toast } = useToast();
   const { loading, loadAllData } = useDatabase();
   const store = useStore();
+  const { t } = useI18n();
   const [backups, setBackups] = useState<BackupEntry[]>([]);
   const [exportFormat, setExportFormat] = useState<'json' | 'csv'>('csv');
   const [exporting, setExporting] = useState<string | null>(null);
@@ -128,7 +130,7 @@ export default function Backup() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Backup & Exportação</h1>
+          <h1 className="text-2xl font-bold">{t('page.backupExport')}</h1>
           <p className="text-muted-foreground">Gerir backups e exportar dados</p>
         </div>
         <div className="flex gap-2">

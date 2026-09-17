@@ -1,6 +1,7 @@
 import { useState, useCallback, memo } from 'react';
 import { Users, Minus, X, Check, Settings2, PlusCircle, Receipt } from 'lucide-react';
 import { useBusiness } from '@/contexts/BusinessContext';
+import { useI18n } from '@/contexts/I18nContext';
 import { PaymentModal } from '@/components/sales/PaymentModal';
 import { useDatabase } from '@/hooks/useDatabase';
 import { Button } from '@/components/ui/button';
@@ -42,6 +43,7 @@ export default function Tables() {
   const { business } = useBusiness();
   const { addTable, updateTable, addOrder, updateOrder } = useTablesPersistence();
   const { registerCreditCharge } = useCredits();
+  const { t } = useI18n();
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -158,7 +160,7 @@ export default function Tables() {
     setSelectedTable(null);
   }, [selectedTable, orderItems, total, updateOrder, addOrder, updateTable]);
 
-  const handlePaymentConfirm = useCallback(async (payment: { cash: number; mpesa: number; emola: number; card: number }) => {
+  const handlePaymentConfirm = useCallback(async (payment: { cash: number; mpesa: number; emola: number; card: number; customerId?: string }) => {
     if (!selectedTable) return;
 
     try {
@@ -176,6 +178,7 @@ export default function Tables() {
           total: totalReceived,
           change: Math.max(0, change),
         },
+        customerId: payment.customerId,
         createdAt: new Date(),
         tableId: selectedTable.id,
         table_number: selectedTable.number,
@@ -307,7 +310,7 @@ export default function Tables() {
     }
   }, [orderItems, generatePreBillHTML]);
 
-  const generatePreBillHTML = useCallback(() => {
+  function generatePreBillHTML() {
     const formatCurrency = (value: number) => `${value.toFixed(2)} MT`;
     const centerText = (text: string, width = 48) => {
       const padding = Math.max(0, Math.floor((width - text.length) / 2));
@@ -401,7 +404,7 @@ export default function Tables() {
         </head>
         <body><pre>${bill.join('\n')}</pre></body>
       </html>`;
-  }, [business, selectedTable, orderItems, total]);
+  }
 
   const handleRequestPayment = useCallback(() => {
     if (!selectedTable || orderItems.length === 0) return;
@@ -459,7 +462,7 @@ export default function Tables() {
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Users className="h-6 w-6 text-primary" />
-            Gestão de Mesas
+            {t('nav.tables')}
           </h1>
           <p className="text-muted-foreground">Gerir pedidos por mesa</p>
         </div>

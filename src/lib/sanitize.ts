@@ -133,6 +133,7 @@ export function sanitizeSaleData(data: any) {
     table_number: data.table_number,
     table_name: data.table_name,
     table_customer_name: data.table_customer_name,
+    customerId: data.customerId ? data.customerId : undefined,
   };
 }
 

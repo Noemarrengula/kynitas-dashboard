@@ -1,5 +1,7 @@
-import { DollarSign, ShoppingCart, AlertTriangle, TrendingUp, Banknote, CreditCard, Smartphone, Package, Calendar, Loader2 } from 'lucide-react';
-import { MetricCard } from '@/components/dashboard/MetricCard';
+import { useMemo, useState, type ComponentType } from 'react';
+import { ShoppingCart, AlertTriangle, Banknote, CreditCard, Smartphone, Package, Calendar, Receipt, RefreshCw, Target } from 'lucide-react';
+import { QuickStat } from '@/components/dashboard/QuickStat';
+import { DateFilter, type DateRange } from '@/components/dashboard/DateFilter';
 import { SalesChart } from '@/components/dashboard/SalesChart';
 import { TopProducts } from '@/components/dashboard/TopProducts';
 import { RecentSales } from '@/components/dashboard/RecentSales';
@@ -12,62 +14,169 @@ import { useStore } from '@/store/useStore';
 import { formatCurrency } from '@/lib/utils';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { PageHeader } from '@/components/ui/page-header';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
-import { startOfWeek, startOfMonth, endOfWeek, endOfMonth } from 'date-fns';
+import { startOfDay, addDays, subDays, differenceInDays, startOfWeek, startOfMonth, endOfWeek, endOfMonth } from 'date-fns';
 import { useBusinessGoals } from '@/hooks/useBusinessGoals';
+import { useI18n } from '@/contexts/I18nContext';
+
+interface PaymentMethodCardProps {
+  label: string;
+  value: number;
+  icon: ComponentType<{ className?: string }>;
+  tint: 'green' | 'blue' | 'purple' | 'orange';
+}
+
+const paymentTints = {
+  green: { icon: 'text-green-500', chip: 'bg-green-500/10' },
+  blue: { icon: 'text-blue-500', chip: 'bg-blue-500/10' },
+  purple: { icon: 'text-purple-500', chip: 'bg-purple-500/10' },
+  orange: { icon: 'text-orange-500', chip: 'bg-orange-500/10' },
+};
+
+function PaymentMethodCard({ label, value, icon: Icon, tint }: PaymentMethodCardProps) {
+  const tintClasses = paymentTints[tint];
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          <div className={`p-2 rounded-lg shrink-0 ${tintClasses.chip}`}>
+            <Icon className={`h-5 w-5 ${tintClasses.icon}`} />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs text-muted-foreground truncate">{label}</p>
+            <p className="text-lg font-bold truncate">{formatCurrency(value)}</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+interface TrendData {
+  value: number;
+  type: 'increase' | 'decrease' | 'neutral';
+  period: string;
+}
+
+function getTrend(current: number, previous: number): TrendData | undefined {
+  if (previous === 0) return undefined;
+  const pct = ((current - previous) / previous) * 100;
+  return {
+    value: Math.abs(Math.round(pct)),
+    type: pct > 0 ? 'increase' : pct < 0 ? 'decrease' : 'neutral',
+    period: 'vs período anterior',
+  };
+}
+
+const initialRange: DateRange = {
+  from: new Date(),
+  to: new Date(),
+  label: 'Hoje',
+};
 
 export default function Dashboard() {
   const { loading, loadAllSales } = useDatabase();
   const { orders, products, sales, ingredients } = useStore();
   const { goals } = useBusinessGoals();
-  
+  const [range, setRange] = useState<DateRange>(initialRange);
+  const [refreshing, setRefreshing] = useState(false);
+  const { t } = useI18n();
+
   const now = new Date();
   const weekStart = startOfWeek(now, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
   const monthStart = startOfMonth(now);
   const monthEnd = endOfMonth(now);
-  
+
   const todaySales = sales
     .filter(s => new Date(s.createdAt).toDateString() === now.toDateString())
     .reduce((acc, s) => acc + s.total, 0);
-  
+
   const weekSales = sales
     .filter(s => {
       const date = new Date(s.createdAt);
       return date >= weekStart && date <= weekEnd;
     })
     .reduce((acc, s) => acc + s.total, 0);
-  
+
   const monthSales = sales
     .filter(s => {
       const date = new Date(s.createdAt);
       return date >= monthStart && date <= monthEnd;
     })
     .reduce((acc, s) => acc + s.total, 0);
-  
-  const todaySalesCount = sales.filter(s => new Date(s.createdAt).toDateString() === now.toDateString()).length;
-  
+
   const criticalStockProducts = products.filter(p => p.stock <= 5);
   const criticalIngredients = ingredients.filter(i => i.stock <= i.minStock);
   const activeOrders = orders.filter(o => o.status !== 'paid');
 
-  // Payment method totals (today)
-  const todayPayments = sales
-    .filter(s => new Date(s.createdAt).toDateString() === new Date().toDateString())
-    .reduce((acc, s) => {
-      acc.cash += s.paymentDetails.cash;
-      acc.mpesa += s.paymentDetails.mpesa;
-      acc.emola += s.paymentDetails.emola;
-      acc.card += s.paymentDetails.card;
-      return acc;
-    }, { cash: 0, mpesa: 0, emola: 0, card: 0 });
+  // Vendas do período selecionado + período anterior equivalente
+  const filteredSales = useMemo(() => {
+    const from = startOfDay(range.from);
+    const toEnd = addDays(startOfDay(range.to), 1);
+    return sales.filter(s => {
+      const d = new Date(s.createdAt);
+      return d >= from && d < toEnd;
+    });
+  }, [sales, range]);
+
+  const previousSales = useMemo(() => {
+    const from = startOfDay(range.from);
+    const duration = Math.max(1, differenceInDays(range.to, range.from) + 1);
+    const prevFrom = subDays(from, duration);
+    return sales.filter(s => {
+      const d = new Date(s.createdAt);
+      return d >= prevFrom && d < from;
+    });
+  }, [sales, range]);
+
+  const metrics = useMemo(() => {
+    const revenue = filteredSales.reduce((acc, s) => acc + s.total, 0);
+    const count = filteredSales.length;
+    const productsSold = filteredSales.reduce((acc, s) => acc + s.items.reduce((a, i) => a + i.quantity, 0), 0);
+    const avgTicket = count > 0 ? revenue / count : 0;
+
+    const prevRevenue = previousSales.reduce((acc, s) => acc + s.total, 0);
+    const prevCount = previousSales.length;
+    const prevProductsSold = previousSales.reduce((acc, s) => acc + s.items.reduce((a, i) => a + i.quantity, 0), 0);
+    const prevAvgTicket = prevCount > 0 ? prevRevenue / prevCount : 0;
+
+    return { revenue, count, productsSold, avgTicket, prevRevenue, prevCount, prevProductsSold, prevAvgTicket };
+  }, [filteredSales, previousSales]);
+
+  const periodPayments = useMemo(() => {
+    return filteredSales.reduce<{ cash: number; mpesa: number; emola: number; card: number }>(
+      (acc, s) => {
+        acc.cash += s.paymentDetails?.cash ?? 0;
+        acc.mpesa += s.paymentDetails?.mpesa ?? 0;
+        acc.emola += s.paymentDetails?.emola ?? 0;
+        acc.card += s.paymentDetails?.card ?? 0;
+        return acc;
+      },
+      { cash: 0, mpesa: 0, emola: 0, card: 0 },
+    );
+  }, [filteredSales]);
 
   const paymentChartData = [
-    { name: 'Dinheiro', value: todayPayments.cash, color: '#10b981' },
-    { name: 'M-Pesa', value: todayPayments.mpesa, color: '#3b82f6' },
-    { name: 'E-Mola', value: todayPayments.emola, color: '#8b5cf6' },
-    { name: 'Cartão', value: todayPayments.card, color: '#f59e0b' },
+    { name: 'Dinheiro', value: periodPayments.cash, color: '#10b981' },
+    { name: 'M-Pesa', value: periodPayments.mpesa, color: '#3b82f6' },
+    { name: 'E-Mola', value: periodPayments.emola, color: '#8b5cf6' },
+    { name: 'Cartão', value: periodPayments.card, color: '#f59e0b' },
   ].filter(m => m.value > 0);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await loadAllSales();
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -80,112 +189,61 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground">Visão geral do seu estabelecimento</p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => { loadAllSales().catch(console.error); }}
-            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
-          >
-            📊 Carregar Histórico Completo
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        title={t('nav.dashboard')}
+        description="Visão geral do seu estabelecimento"
+      >
+        <Badge variant="outline" className="text-xs">
+          {range.label}
+        </Badge>
+        <DateFilter value={range} onChange={setRange} />
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={handleRefresh}
+          disabled={refreshing}
+          title="Carregar histórico completo"
+        >
+          <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+        </Button>
+      </PageHeader>
 
       {/* Alertas e Health Check */}
       <AlertsPanel />
       <HealthCheckPanel showDetails={true} />
 
-      {/* Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard
-          title="Vendas do Dia"
-          value={formatCurrency(todaySales)}
-          icon={DollarSign}
-          variant="primary"
-          trend={{ value: 12.5, positive: true }}
+      {/* Métricas do período */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <QuickStat
+          title="Receita do Período"
+          value={metrics.revenue}
+          format="currency"
+          change={getTrend(metrics.revenue, metrics.prevRevenue)}
         />
-        <MetricCard
-          title="Pedidos Ativos"
-          value={activeOrders.length}
-          icon={ShoppingCart}
-          trend={{ value: 8, positive: true }}
+        <QuickStat
+          title="Vendas no Período"
+          value={metrics.count}
+          change={getTrend(metrics.count, metrics.prevCount)}
         />
-        <MetricCard
-          title="Stock Crítico"
-          value={criticalStockProducts.length}
-          icon={AlertTriangle}
-          variant={criticalStockProducts.length > 0 ? 'destructive' : 'default'}
+        <QuickStat
+          title="Ticket Médio"
+          value={metrics.avgTicket}
+          format="currency"
+          change={getTrend(metrics.avgTicket, metrics.prevAvgTicket)}
         />
-        <MetricCard
+        <QuickStat
           title="Produtos Vendidos"
-          value={orders.reduce((acc, o) => acc + o.items.reduce((a, i) => a + i.quantity, 0), 0)}
-          icon={TrendingUp}
-          variant="success"
-          trend={{ value: 5.2, positive: true }}
+          value={metrics.productsSold}
+          change={getTrend(metrics.productsSold, metrics.prevProductsSold)}
         />
       </div>
 
       {/* Payment Methods Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="border-green-200 bg-green-50/50">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-500/10 rounded-lg">
-                <Banknote className="h-5 w-5 text-green-600" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Dinheiro</p>
-                <p className="text-lg font-bold">{formatCurrency(todayPayments.cash)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-blue-200 bg-blue-50/50">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-500/10 rounded-lg">
-                <Smartphone className="h-5 w-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">M-Pesa</p>
-                <p className="text-lg font-bold">{formatCurrency(todayPayments.mpesa)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-purple-200 bg-purple-50/50">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-500/10 rounded-lg">
-                <Smartphone className="h-5 w-5 text-purple-600" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">E-Mola</p>
-                <p className="text-lg font-bold">{formatCurrency(todayPayments.emola)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-orange-200 bg-orange-50/50">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-orange-500/10 rounded-lg">
-                <CreditCard className="h-5 w-5 text-orange-600" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Cartão</p>
-                <p className="text-lg font-bold">{formatCurrency(todayPayments.card)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <PaymentMethodCard label="Dinheiro" value={periodPayments.cash} icon={Banknote} tint="green" />
+        <PaymentMethodCard label="M-Pesa" value={periodPayments.mpesa} icon={Smartphone} tint="blue" />
+        <PaymentMethodCard label="E-Mola" value={periodPayments.emola} icon={Smartphone} tint="purple" />
+        <PaymentMethodCard label="Cartão" value={periodPayments.card} icon={CreditCard} tint="orange" />
       </div>
 
       {/* Sales Summary */}
@@ -199,18 +257,18 @@ export default function Dashboard() {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
-              <p className="text-sm text-muted-foreground mb-1">Hoje</p>
-              <p className="text-2xl font-bold text-primary">{formatCurrency(todaySales)}</p>
-              <p className="text-xs text-muted-foreground mt-1">{todaySalesCount} vendas</p>
+              <p className="text-sm text-muted-foreground mb-1">{range.label}</p>
+              <p className="text-2xl font-bold text-primary">{formatCurrency(metrics.revenue)}</p>
+              <p className="text-xs text-muted-foreground mt-1">{metrics.count} vendas</p>
             </div>
-            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="p-4 bg-blue-500/5 rounded-lg border border-blue-500/20">
               <p className="text-sm text-muted-foreground mb-1">Esta Semana</p>
-              <p className="text-2xl font-bold text-blue-600">{formatCurrency(weekSales)}</p>
+              <p className="text-2xl font-bold text-blue-500">{formatCurrency(weekSales)}</p>
               <p className="text-xs text-muted-foreground mt-1">Média: {formatCurrency(weekSales / 7)}/dia</p>
             </div>
-            <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+            <div className="p-4 bg-green-500/5 rounded-lg border border-green-500/20">
               <p className="text-sm text-muted-foreground mb-1">Este Mês</p>
-              <p className="text-2xl font-bold text-green-600">{formatCurrency(monthSales)}</p>
+              <p className="text-2xl font-bold text-green-500">{formatCurrency(monthSales)}</p>
               <p className="text-xs text-muted-foreground mt-1">Média: {formatCurrency(monthSales / now.getDate())}/dia</p>
             </div>
           </div>
@@ -233,7 +291,7 @@ export default function Dashboard() {
       {paymentChartData.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Métodos de Pagamento (Hoje)</CardTitle>
+            <CardTitle>Métodos de Pagamento ({range.label})</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
@@ -253,9 +311,10 @@ export default function Dashboard() {
                   <Tooltip
                     formatter={(value: number) => formatCurrency(value)}
                     contentStyle={{
-                      backgroundColor: 'hsl(0, 0%, 100%)',
-                      border: '1px solid hsl(330, 10%, 90%)',
+                      backgroundColor: 'hsl(var(--popover))',
+                      border: '1px solid hsl(var(--border))',
                       borderRadius: '8px',
+                      color: 'hsl(var(--popover-foreground))',
                     }}
                   />
                   <Legend />
@@ -268,7 +327,7 @@ export default function Dashboard() {
 
       {/* Stock Alerts */}
       {(criticalIngredients.length > 0 || criticalStockProducts.length > 0) && (
-        <Card className="border-warning">
+        <Card className="border-warning/40">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-warning">
               <AlertTriangle className="h-5 w-5" />
@@ -295,7 +354,7 @@ export default function Dashboard() {
                 </div>
               </div>
             )}
-            
+
             {criticalStockProducts.length > 0 && (
               <div>
                 <h4 className="font-semibold mb-3 flex items-center gap-2">
@@ -325,7 +384,7 @@ export default function Dashboard() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
-              <TrendingUp className="h-5 w-5" />
+              <Target className="h-5 w-5" />
               Metas
             </CardTitle>
           </CardHeader>
@@ -354,6 +413,15 @@ export default function Dashboard() {
         </Card>
       )}
 
+      <div className="flex items-center justify-between text-xs text-muted-foreground pt-2">
+        <span className="flex items-center gap-1">
+          <Receipt className="h-3 w-3" />
+          {metrics.count} venda(s) no período selecionado
+        </span>
+        <span>
+          Período anterior: {formatCurrency(metrics.prevRevenue)}
+        </span>
+      </div>
     </div>
   );
 }

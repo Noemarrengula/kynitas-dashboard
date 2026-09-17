@@ -176,6 +176,8 @@ function dbOrderToOrder(db: any): Order {
   return {
     id: db.id,
     tableId: db.table_id,
+    tableName: db.table_name || undefined,
+    table_number: db.table_number || undefined,
     items: db.items || [],
     status: db.status || 'pending',
     total: db.total || 0,

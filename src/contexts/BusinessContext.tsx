@@ -16,11 +16,18 @@ interface Business {
   currency?: string;
 }
 
+interface BusinessUsersJoined {
+  business_id: string;
+  role: BusinessRole;
+  businesses: Business;
+}
+
 interface BusinessContextType {
   business: Business | null;
   currentBusiness: Business | null;
   businesses: Business[];
   currentBusinessUser: BusinessUser | null;
+  userRole: BusinessRole | null;
   loading: boolean;
   switchBusiness: (businessId: string) => void;
   refreshBusiness: () => Promise<void>;
@@ -46,7 +53,7 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const { data, error } = await supabase
+      const { data: rawData, error } = await supabase
         .from('business_users')
         .select('business_id, role, businesses(*)')
         .eq('user_id', user.id)
@@ -54,10 +61,12 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
 
       if (error) throw error;
 
-      const businessList = data?.map(item => ({
+      const data = (rawData ?? []) as unknown as BusinessUsersJoined[];
+
+      const businessList: Business[] = data.map(item => ({
         ...item.businesses,
         userRole: item.role as BusinessRole,
-      })).filter(Boolean) as (Business & { userRole: BusinessRole })[];
+      }));
 
       setBusinesses(businessList);
 
@@ -70,7 +79,7 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
         useStore.getState().setCurrency(cur);
         setUtilsCurrency(cur);
 
-        const businessUser = data?.find(d => d.business_id === business.id);
+        const businessUser = data.find(d => d.business_id === business.id);
         if (businessUser) {
           setCurrentBusinessUser({
             user_id: user.id,
@@ -101,7 +110,7 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
     loadBusinesses();
   }, [user]);
 
-  const switchBusiness = (businessId: string) => {
+  const switchBusiness = async (businessId: string) => {
     const business = businesses.find(b => b.id === businessId);
     if (business) {
       setCurrentBusiness(business);
@@ -109,29 +118,31 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
       useStore.getState().setCurrency(cur);
       setUtilsCurrency(cur);
 
-      supabase
-        .from('business_users')
-        .select('role')
-        .eq('business_id', businessId)
-        .eq('user_id', user?.id)
-        .single()
-        .then(({ data }) => {
-          if (data && user) {
-            setCurrentBusinessUser({
-              user_id: user.id,
-              email: user.email || '',
-              name: user.user_metadata?.name || '',
-              role: data.role as BusinessRole,
-              active: true,
-              business_id: business.id,
-              business_name: business.name,
-              created_at: new Date().toISOString(),
-            });
-          }
-        })
-        .catch((err) => {
-          console.error('Erro ao buscar role do usuário:', err);
-        });
+      try {
+        const { data, error } = await supabase
+          .from('business_users')
+          .select('role')
+          .eq('business_id', businessId)
+          .eq('user_id', user?.id)
+          .single();
+
+        if (error) throw error;
+
+        if (data && user) {
+          setCurrentBusinessUser({
+            user_id: user.id,
+            email: user.email || '',
+            name: user.user_metadata?.name || '',
+            role: data.role as BusinessRole,
+            active: true,
+            business_id: business.id,
+            business_name: business.name,
+            created_at: new Date().toISOString(),
+          });
+        }
+      } catch (err) {
+        console.error('Erro ao buscar role do usuário:', err);
+      }
 
       localStorage.setItem('currentBusinessId', businessId);
       toast({
@@ -151,6 +162,7 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
       currentBusiness,
       businesses,
       currentBusinessUser,
+      userRole: currentBusinessUser?.role ?? null,
       loading,
       switchBusiness,
       refreshBusiness,

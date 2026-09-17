@@ -338,7 +338,7 @@ const ProductModal = memo(function ProductModal({ open, onClose, product, type }
           </div>
         </form>
       </DialogContent>
-    </Dialog>
-  );
-};
+      </Dialog>
+    );
+});
 export { ProductModal };

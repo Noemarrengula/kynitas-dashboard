@@ -3,22 +3,20 @@ import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { Loader2 } from 'lucide-react';
-import type { Permission } from '@/hooks/usePermissions';
+import type { Feature } from '@/hooks/usePermissions';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requiredPermission?: Permission;
-  requireSuperAdmin?: boolean;
+  requiredFeature?: Feature;
 }
 
 export function ProtectedRoute({
   children,
-  requiredPermission,
-  requireSuperAdmin,
+  requiredFeature,
 }: ProtectedRouteProps) {
   const { user, loading: authLoading } = useAuth();
   const { loading: businessLoading } = useBusiness();
-  const { can, isSuperAdmin } = usePermissions();
+  const { can } = usePermissions();
 
   if (authLoading || businessLoading) {
     return (
@@ -32,11 +30,7 @@ export function ProtectedRoute({
     return <Navigate to="/login" replace />;
   }
 
-  if (requireSuperAdmin && !isSuperAdmin) {
-    return <Navigate to="/dashboard" replace />;
-  }
-
-  if (requiredPermission && !can(requiredPermission)) {
+  if (requiredFeature && !can(requiredFeature)) {
     return <Navigate to="/dashboard" replace />;
   }
 

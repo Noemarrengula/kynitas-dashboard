@@ -6,7 +6,7 @@ export interface CreateUserParams {
   password: string;
   name: string;
   businessId: string;
-  role: Extract<BusinessRole, 'manager' | 'staff'>;
+  role: BusinessRole;
 }
 
 export interface CreateUserResult {
@@ -38,6 +38,20 @@ export async function listBusinessUsers(
 
   if (error) throw error;
   return (data || []) as BusinessUser[];
+}
+
+export async function updateBusinessUserRole(
+  userId: string,
+  businessId: string,
+  role: BusinessRole
+): Promise<void> {
+  const { error } = await supabase.rpc('update_business_user_role', {
+    p_user_id: userId,
+    p_business_id: businessId,
+    p_role: role,
+  });
+
+  if (error) throw error;
 }
 
 export async function deactivateBusinessUser(

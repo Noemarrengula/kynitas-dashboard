@@ -31,6 +31,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { ProductModal } from '@/components/products/ProductModal';
 import { useDatabase } from '@/hooks/useDatabase';
+import { usePermissions } from '@/hooks/usePermissions';
+import { useI18n } from '@/contexts/I18nContext';
 import { Product } from '@/types';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -38,7 +40,11 @@ import { cn } from '@/lib/utils';
 const ITEMS_PER_PAGE = 8;
 
 export default function Meals() {
-  const { products, deleteProduct, loading, salesByProduct, stockByMeal } = useDatabase();
+  const { products, deleteProduct, loading, salesByProduct, stockByMeal, profitByProduct } = useDatabase();
+  const { can } = usePermissions();
+  const { t } = useI18n();
+  const canEdit = can('produtos_editar');
+  const canSeeCost = can('precos_margens');
   const meals = products.filter(p => p && p.type === 'meal' && p.name && p.internal_id);
 
   const [search, setSearch] = useState('');
@@ -81,7 +87,34 @@ export default function Meals() {
     };
   });
 
-  const paginatedMeals = mealsWithStock.slice(
+  // Add real cost and profit data (apenas para quem tem precos_margens)
+  const mealsWithProfit = mealsWithStock.map(meal => {
+    const profit = profitByProduct[meal.id];
+    return {
+      ...meal,
+      realUnitCost: profit?.realUnitCost ?? 0,
+      marginPct: profit?.marginPct ?? 0,
+      grossProfit: profit?.grossProfit ?? 0,
+    };
+  });
+
+  // Totais de food cost (custo real / receita) das refeições com ficha técnica
+  const foodCostSummary = useMemo(() => {
+    const scoped = meals.map(meal => profitByProduct[meal.id]);
+    const tot = scoped.reduce((acc, p) => ({
+      totalRevenue: acc.totalRevenue + (p?.totalRevenue ?? 0),
+      totalCost: acc.totalCost + (p?.totalCost ?? 0),
+      totalSales: acc.totalSales + (p?.totalSales ?? 0),
+    }), { totalRevenue: 0, totalCost: 0, totalSales: 0 });
+    return {
+      ...tot,
+      grossProfit: tot.totalRevenue - tot.totalCost,
+      foodCostPct: tot.totalRevenue > 0 ? (tot.totalCost / tot.totalRevenue) * 100 : 0,
+      marginPct: tot.totalRevenue > 0 ? ((tot.totalRevenue - tot.totalCost) / tot.totalRevenue) * 100 : 0,
+    };
+  }, [meals, profitByProduct]);
+
+  const paginatedMeals = mealsWithProfit.slice(
     (page - 1) * ITEMS_PER_PAGE,
     page * ITEMS_PER_PAGE
   );
@@ -124,14 +157,16 @@ export default function Meals() {
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <UtensilsCrossed className="h-6 w-6 text-primary" />
-            Refeições
+            {t('nav.meals')}
           </h1>
           <p className="text-muted-foreground">Gerir o cardápio de refeições</p>
         </div>
-        <Button variant="gradient" onClick={handleAddNew}>
-          <Plus className="h-4 w-4 mr-2" />
-          Nova Refeição
-        </Button>
+        {canEdit && (
+          <Button variant="gradient" onClick={handleAddNew}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nova Refeição
+          </Button>
+        )}
       </div>
 
       {/* Filters */}
@@ -158,6 +193,34 @@ export default function Meals() {
         </Select>
       </div>
 
+      {/* Food cost summary */}
+      {canSeeCost && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-card border rounded-xl p-4 space-y-1">
+            <p className="text-xs text-muted-foreground">Receita (venda refeições)</p>
+            <p className="text-2xl font-bold">{foodCostSummary.totalRevenue.toLocaleString('pt-MZ')} MT</p>
+            <p className="text-xs text-muted-foreground">{foodCostSummary.totalSales} pratos vendidos</p>
+          </div>
+          <div className="bg-card border rounded-xl p-4 space-y-1">
+            <p className="text-xs text-muted-foreground">Custo Real (ficha técnica)</p>
+            <p className="text-2xl font-bold text-destructive">{foodCostSummary.totalCost.toLocaleString('pt-MZ')} MT</p>
+            <p className="text-xs text-muted-foreground">com ingredientes consumidos</p>
+          </div>
+          <div className="bg-card border rounded-xl p-4 space-y-1">
+            <p className="text-xs text-muted-foreground">Lucro Bruto</p>
+            <p className={cn("text-2xl font-bold", foodCostSummary.grossProfit < 0 ? 'text-destructive' : 'text-success')}>
+              {foodCostSummary.grossProfit.toLocaleString('pt-MZ')} MT
+            </p>
+            <p className="text-xs text-muted-foreground">receita − custo real</p>
+          </div>
+          <div className="bg-card border rounded-xl p-4 space-y-1">
+            <p className="text-xs text-muted-foreground">Food Cost</p>
+            <p className="text-2xl font-bold">{foodCostSummary.foodCostPct.toFixed(1)}%</p>
+            <p className="text-xs text-muted-foreground">margem: {foodCostSummary.marginPct.toFixed(1)}%</p>
+          </div>
+        </div>
+      )}
+
       {/* Table */}
       <div className="bg-card border rounded-xl overflow-hidden">
         <Table>
@@ -167,18 +230,23 @@ export default function Meals() {
               <TableHead>ID</TableHead>
               <TableHead>Categoria</TableHead>
               <TableHead className="text-right">Preço</TableHead>
-              <TableHead className="text-right">Custo Est.</TableHead>
-              <TableHead className="text-right">Custo Real</TableHead>
+              {canSeeCost && (
+                <>
+                  <TableHead className="text-right">Custo Est.</TableHead>
+                  <TableHead className="text-right">Custo Real</TableHead>
+                  <TableHead className="text-right">Margem</TableHead>
+                </>
+              )}
               <TableHead className="text-right">Stock</TableHead>
               <TableHead className="text-right">Vendas</TableHead>
               <TableHead className="text-right">Receita</TableHead>
-              <TableHead className="text-right">Ações</TableHead>
+              {canEdit && <TableHead className="text-right">Ações</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {paginatedMeals.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center py-10 text-muted-foreground">
+                <TableCell colSpan={7 + (canSeeCost ? 3 : 0) + (canEdit ? 1 : 0)} className="text-center py-10 text-muted-foreground">
                   Nenhuma refeição encontrada
                 </TableCell>
               </TableRow>
@@ -215,12 +283,31 @@ export default function Meals() {
                   <TableCell className="text-right font-medium">
                     {(product.price ?? 0).toLocaleString('pt-MZ')} MT
                   </TableCell>
-                  <TableCell className="text-right text-muted-foreground">
-                    {(product.estimatedCost ?? 0).toLocaleString('pt-MZ')} MT
-                  </TableCell>
-                  <TableCell className="text-right text-muted-foreground">
-                    {product.costPrice != null ? `${product.costPrice.toLocaleString('pt-MZ')} MT` : '—'}
-                  </TableCell>
+                  {canSeeCost && (
+                    <>
+                      <TableCell className="text-right text-muted-foreground">
+                        {(product.estimatedCost ?? 0).toLocaleString('pt-MZ')} MT
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {product.realUnitCost > 0
+                          ? `${(product.realUnitCost).toLocaleString('pt-MZ', { maximumFractionDigits: 2 })} MT`
+                          : '—'}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {product.realUnitCost > 0 && product.price > 0 ? (
+                          <Badge className={cn(
+                            product.marginPct >= 30 ? 'bg-success/10 text-success hover:bg-success/20' :
+                            product.marginPct >= 10 ? 'bg-warning/10 text-warning hover:bg-warning/20' :
+                            'bg-destructive/10 text-destructive hover:bg-destructive/20'
+                          )}>
+                            {product.marginPct.toFixed(0)}%
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
+                      </TableCell>
+                    </>
+                  )}
                   <TableCell className="text-right">
                     <Badge className={cn(
                       product.stock <= 5 ? 'bg-destructive/10 text-destructive hover:bg-destructive/20' :
@@ -238,15 +325,19 @@ export default function Meals() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
-                      <Button variant="ghost" size="icon-sm" onClick={() => handleEditRecipe(product)} title="Editar Receita">
-                        <ChefHat className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon-sm" onClick={() => handleEdit(product)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon-sm" onClick={() => handleDelete(product)} className="text-destructive hover:text-destructive">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {canEdit && (
+                        <>
+                          <Button variant="ghost" size="icon-sm" onClick={() => handleEditRecipe(product)} title="Editar Receita">
+                            <ChefHat className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon-sm" onClick={() => handleEdit(product)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon-sm" onClick={() => handleDelete(product)} className="text-destructive hover:text-destructive">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

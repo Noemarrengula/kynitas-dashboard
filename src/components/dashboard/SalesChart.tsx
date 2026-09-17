@@ -32,25 +32,26 @@ export function SalesChart() {
                 <stop offset="95%" stopColor="hsl(330, 100%, 50%)" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(330, 10%, 90%)" />
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
             <XAxis 
               dataKey="day" 
-              stroke="hsl(330, 15%, 45%)"
+              stroke="hsl(var(--muted-foreground))"
               fontSize={12}
               tickLine={false}
             />
             <YAxis 
-              stroke="hsl(330, 15%, 45%)"
+              stroke="hsl(var(--muted-foreground))"
               fontSize={12}
               tickLine={false}
               tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
             />
             <Tooltip
               contentStyle={{
-                backgroundColor: 'hsl(0, 0%, 100%)',
-                border: '1px solid hsl(330, 10%, 90%)',
+                backgroundColor: 'hsl(var(--popover))',
+                border: '1px solid hsl(var(--border))',
                 borderRadius: '8px',
                 boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                color: 'hsl(var(--popover-foreground))',
               }}
               formatter={(value: number) => [formatCurrency(value), 'Vendas']}
             />

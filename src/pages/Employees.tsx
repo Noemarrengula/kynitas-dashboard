@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
+import { useI18n } from '@/contexts/I18nContext';
 import { formatCurrency } from '@/lib/utils';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
@@ -36,6 +37,7 @@ const roleLabels: Record<string, string> = {
 export default function Employees() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const { t } = useI18n();
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -81,7 +83,7 @@ export default function Employees() {
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Users className="h-6 w-6 text-primary" />
-            Funcionários
+            {t('nav.employees')}
           </h1>
           <p className="text-muted-foreground">Gestão de equipe</p>
         </div>

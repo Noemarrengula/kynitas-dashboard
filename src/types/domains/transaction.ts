@@ -18,6 +18,7 @@ export interface Sale {
   table_number?: number;
   table_name?: string;
   table_customer_name?: string;
+  customerId?: string;
   isCredit?: boolean;
   creditId?: string;
 }

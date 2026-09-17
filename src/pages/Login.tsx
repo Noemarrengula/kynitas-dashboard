@@ -30,7 +30,7 @@ export default function Login() {
       <Card className="w-full max-w-md mx-4">
         <CardHeader className="space-y-4">
           <div className="flex justify-center">
-            <img src="/logo.png" alt="Marrengula IT" className="h-20 w-20 object-contain" />
+            <img src="./logo.png" alt="Marrengula IT" className="h-20 w-20 object-contain" />
           </div>
            <CardTitle className="text-2xl font-bold text-center">Marrengula IT ERP</CardTitle>
           <CardDescription className="text-center">

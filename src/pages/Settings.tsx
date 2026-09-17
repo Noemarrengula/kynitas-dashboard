@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, User, Tag, Users, Save, Building2, Printer, Database, DollarSign, FileText } from 'lucide-react';
+import { Settings as SettingsIcon, User, Tag, Users, Save, Building2, Printer, Database, DollarSign, FileText, Languages } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useStore } from '@/store/useStore';
 import { useBusiness } from '@/contexts/BusinessContext';
+import { useI18n } from '@/contexts/I18nContext';
 import { useInvoices } from '@/hooks/useInvoices';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/hooks/use-toast';
@@ -17,6 +19,7 @@ import { BackupSettings } from '@/components/settings/BackupSettings';
 import { CashDrawerSettings } from '@/components/settings/CashDrawerSettings';
 import { usePermissions } from '@/hooks/usePermissions';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { ALLOWED_LANGUAGES, type Language } from '@/i18n/dictionaries';
 import UsersPage from '@/pages/settings/Users';
 
 const defaultCategories = {
@@ -27,6 +30,7 @@ const defaultCategories = {
 export default function Settings() {
   const { user, setUser } = useStore();
   const { business, refreshBusiness } = useBusiness();
+  const { language, setLanguage, t } = useI18n();
   const { invoiceSeries } = useInvoices();
   const [profile, setProfile] = useState({
     name: user?.name || '',
@@ -249,7 +253,7 @@ export default function Settings() {
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <SettingsIcon className="h-6 w-6 text-primary" />
-          Configurações
+          {t('nav.settings')}
         </h1>
         <p className="text-muted-foreground">Gerir preferências do sistema</p>
       </div>
@@ -258,43 +262,47 @@ export default function Settings() {
         <TabsList>
           <TabsTrigger value="business" className="gap-2">
             <Building2 className="h-4 w-4" />
-            Negócio
+            {t('settings.business')}
           </TabsTrigger>
           <TabsTrigger value="profile" className="gap-2">
             <User className="h-4 w-4" />
-            Perfil
+            {t('settings.profile')}
           </TabsTrigger>
           <TabsTrigger value="categories" className="gap-2">
             <Tag className="h-4 w-4" />
-            Categorias
+            {t('settings.categories')}
           </TabsTrigger>
           <TabsTrigger value="employees" className="gap-2">
             <Users className="h-4 w-4" />
-            Funcionários
+            {t('settings.employees')}
           </TabsTrigger>
           <TabsTrigger value="printer" className="gap-2">
             <Printer className="h-4 w-4" />
-            Impressora
+            {t('settings.printer')}
           </TabsTrigger>
           <TabsTrigger value="backup" className="gap-2">
             <Database className="h-4 w-4" />
-            Backup
+            {t('settings.backup')}
           </TabsTrigger>
           <TabsTrigger value="cashdrawer" className="gap-2">
             <DollarSign className="h-4 w-4" />
-            Gaveta
+            {t('settings.cashdrawer')}
           </TabsTrigger>
           <TabsTrigger value="fiscal" className="gap-2">
             <FileText className="h-4 w-4" />
-            Fiscal
+            {t('settings.fiscal')}
           </TabsTrigger>
           <TabsTrigger value="currency" className="gap-2">
             <DollarSign className="h-4 w-4" />
-            Moeda
+            {t('settings.currency')}
+          </TabsTrigger>
+          <TabsTrigger value="language" className="gap-2">
+            <Languages className="h-4 w-4" />
+            {t('settings.language')}
           </TabsTrigger>
           <TabsTrigger value="users" className="gap-2">
             <Users className="h-4 w-4" />
-            Utilizadores
+            {t('settings.users')}
           </TabsTrigger>
         </TabsList>
 
@@ -576,6 +584,34 @@ export default function Settings() {
               <Button variant="gradient" onClick={handleSaveCurrency}>
                 <Save className="h-4 w-4 mr-2" /> Guardar Moeda
               </Button>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* Language Tab */}
+        <TabsContent value="language" className="animate-fade-in">
+          <div className="bg-card border rounded-xl p-6 max-w-2xl">
+            <h3 className="text-lg font-semibold mb-6">{t('settings.language')}</h3>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>{t('settings.language')}</Label>
+                <Select
+                  value={language}
+                  onValueChange={(v) => setLanguage(v as Language)}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {ALLOWED_LANGUAGES.map((lang) => (
+                      <SelectItem key={lang} value={lang}>
+                        {lang === 'pt' ? 'Português' : 'English'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Afecta os textos da interface e é guardado neste dispositivo.
+                </p>
+              </div>
             </div>
           </div>
         </TabsContent>

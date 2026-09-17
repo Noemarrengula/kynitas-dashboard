@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { History, Eye, Filter, Printer, Receipt } from 'lucide-react';
 import { useBusiness } from '@/contexts/BusinessContext';
+import { useI18n } from '@/contexts/I18nContext';
 import { sanitizeSearchQuery } from '@/lib/sanitize';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -23,6 +24,7 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 export default function SalesHistory() {
   const { sales, loading } = useDatabase();
   const { business } = useBusiness();
+  const { t } = useI18n();
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [search, setSearch] = useState('');
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
@@ -187,7 +189,7 @@ export default function SalesHistory() {
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <History className="h-6 w-6 text-primary" />
-            Histórico de Vendas
+            {t('page.salesHistory')}
           </h1>
           <p className="text-muted-foreground">Todas as vendas realizadas</p>
         </div>

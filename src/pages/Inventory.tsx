@@ -8,14 +8,21 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Label } from '@/components/ui/label';
 import { useStore } from '@/store/useStore';
 import { useDatabase } from '@/hooks/useDatabase';
+import { useI18n } from '@/contexts/I18nContext';
+import { usePermissions } from '@/hooks/usePermissions';
+import { ForecastSection } from '@/components/stock/ForecastSection';
+import { PageHeader } from '@/components/ui/page-header';
 import { toast } from '@/hooks/use-toast';
 import { formatCurrency, cn } from '@/lib/utils';
 import { exportInventoryToPDF, exportInventoryToExcel } from '@/lib/pdfExport';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 export default function Inventory() {
-  const { ingredients, updateIngredient, addIngredient, loading } = useDatabase();
+  const { ingredients, updateIngredient, addIngredient, loading, ingredientForecast } = useDatabase();
+  const { can } = usePermissions();
+  const canEdit = can('inventario_editar');
   const { addStockMovement } = useStore();
+  const { t } = useI18n();
   const [search, setSearch] = useState('');
   const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
   const [selectedIngredientId, setSelectedIngredientId] = useState<string | null>(null);
@@ -198,29 +205,26 @@ export default function Inventory() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Package className="h-6 w-6 text-primary" />
-            Inventário de Ingredientes
-          </h1>
-          <p className="text-muted-foreground">Gerir stock de ingredientes para receitas</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handleExportPDF}>
-            <Download className="h-4 w-4 mr-2" />
-            PDF
-          </Button>
-          <Button variant="outline" onClick={handleExportExcel}>
-            <Download className="h-4 w-4 mr-2" />
-            Excel
-          </Button>
+      <PageHeader
+        icon={<Package className="h-6 w-6" />}
+        title={t('nav.inventory')}
+        description="Gerir stock de ingredientes para receitas"
+      >
+        <Button variant="outline" onClick={handleExportPDF}>
+          <Download className="h-4 w-4 mr-2" />
+          {t('common.pdf')}
+        </Button>
+        <Button variant="outline" onClick={handleExportExcel}>
+          <Download className="h-4 w-4 mr-2" />
+          {t('common.excel')}
+        </Button>
+        {canEdit && (
           <Button onClick={() => setCreateDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Novo Ingrediente
           </Button>
-        </div>
-      </div>
+        )}
+      </PageHeader>
 
       {/* Loading */}
       {loading ? (
@@ -229,7 +233,7 @@ export default function Inventory() {
         <div className="text-center py-12 text-muted-foreground">
           <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
           <p className="text-lg font-medium">Nenhum ingrediente cadastrado</p>
-          <p className="text-sm mt-1">Clique em "Novo Ingrediente" para começar</p>
+          <p className="text-sm mt-1">{canEdit ? 'Clique em "Novo Ingrediente" para começar' : 'Sem ingredientes no inventário'}</p>
         </div>
       ) : (
         <>
@@ -248,6 +252,25 @@ export default function Inventory() {
           </div>
         </div>
       )}
+
+      {/* Previsão de Stock */}
+      <ForecastSection
+        title="Previsão de Ingredientes"
+        subtitle="Dias restantes ao consumo real das refeições vendidas (últimos 30 dias)"
+        entries={ingredients.map(ingredient => {
+          const f = ingredientForecast[ingredient.id];
+          return {
+            id: ingredient.id,
+            name: ingredient.name,
+            unit: ingredient.unit || 'un',
+            stock: ingredient.stock ?? 0,
+            avgDailyQty: f?.avgDailyQty ?? 0,
+            daysUntilEmpty: f?.daysUntilEmpty ?? null,
+            needsRestock: f?.needsRestock ?? false,
+            suggestedRestockQty: f?.suggestedRestockQty ?? 0,
+          };
+        })}
+      />
 
       {/* Search */}
       <Input
@@ -286,24 +309,26 @@ export default function Inventory() {
                     {formatCurrency(ingredient.costPerUnit)}/{ingredient.unit}
                   </p>
                 </div>
-                <div className="flex gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => openDeductDialog(ingredient.id)}
-                    aria-label="Reduzir stock"
-                  >
-                    <Minus className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => openAdjustDialog(ingredient.id)}
-                    aria-label="Adicionar stock"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
+<div className="flex gap-1">
+          {canEdit && (<>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => openDeductDialog(ingredient.id)}
+            aria-label="Reduzir stock"
+          >
+            <Minus className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => openAdjustDialog(ingredient.id)}
+            aria-label="Adicionar stock"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+          </>)}
+        </div>
               </div>
 
               <div className="space-y-2">

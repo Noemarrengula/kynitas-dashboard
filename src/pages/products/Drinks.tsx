@@ -34,6 +34,8 @@ import { SearchInput } from '@/components/SearchInput';
 import { ExportButton } from '@/components/ExportButton';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { useDatabase } from '@/hooks/useDatabase';
+import { usePermissions } from '@/hooks/usePermissions';
+import { useI18n } from '@/contexts/I18nContext';
 import { Product } from '@/types';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -43,7 +45,11 @@ import { format } from 'date-fns';
 const ITEMS_PER_PAGE = 8;
 
 export default function Drinks() {
-  const { products, deleteProduct, loading } = useDatabase();
+  const { products, deleteProduct, loading, profitByProduct } = useDatabase();
+  const { can } = usePermissions();
+  const { t } = useI18n();
+  const canEdit = can('produtos_editar');
+  const canSeeCost = can('precos_margens');
   const drinks = products.filter(p => p && p.type === 'drink' && p.name && p.internal_id);
 
   const [search, setSearch] = useState('');
@@ -71,6 +77,16 @@ export default function Drinks() {
     (page - 1) * ITEMS_PER_PAGE,
     page * ITEMS_PER_PAGE
   );
+
+  // Add real cost and profit data (apenas para quem tem precos_margens)
+  const drinksWithProfit = paginatedDrinks.map(drink => {
+    const profit = profitByProduct[drink.id];
+    return {
+      ...drink,
+      realUnitCost: profit?.realUnitCost ?? 0,
+      marginPct: profit?.marginPct ?? 0,
+    };
+  });
 
   const totalPages = Math.ceil(filteredDrinks.length / ITEMS_PER_PAGE);
 
@@ -118,7 +134,7 @@ export default function Drinks() {
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Wine className="h-6 w-6 text-primary" />
-            Bebidas
+            {t('nav.drinks')}
           </h1>
           <p className="text-muted-foreground">Gerir o catálogo de bebidas</p>
         </div>
@@ -128,10 +144,12 @@ export default function Drinks() {
             filename={`bebidas-${format(new Date(), 'yyyy-MM-dd')}`}
             formatData={formatProductsForExport}
           />
-          <Button variant="gradient" onClick={handleAddNew}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nova Bebida
-          </Button>
+          {canEdit && (
+            <Button variant="gradient" onClick={handleAddNew}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nova Bebida
+            </Button>
+          )}
         </div>
       </div>
 
@@ -165,22 +183,26 @@ export default function Drinks() {
               <TableHead>ID</TableHead>
               <TableHead>Categoria</TableHead>
               <TableHead className="text-right">Preço</TableHead>
-              <TableHead className="text-right">Custo</TableHead>
-              <TableHead className="text-right">Margem</TableHead>
+              {canSeeCost && (
+                <>
+                  <TableHead className="text-right">Custo Real</TableHead>
+                  <TableHead className="text-right">Margem</TableHead>
+                </>
+              )}
               <TableHead className="text-right">Dose</TableHead>
               <TableHead className="text-right">Stock</TableHead>
-              <TableHead className="text-right">Ações</TableHead>
+              {canEdit && <TableHead className="text-right">Ações</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {paginatedDrinks.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-10 text-muted-foreground">
+                <TableCell colSpan={6 + (canSeeCost ? 2 : 0) + (canEdit ? 1 : 0)} className="text-center py-10 text-muted-foreground">
                   Nenhuma bebida encontrada
                 </TableCell>
               </TableRow>
             ) : (
-              paginatedDrinks.map((product) => (
+              drinksWithProfit.map((product) => (
                 <TableRow key={product.id} className="animate-fade-in">
                   <TableCell>
                     <div className="flex items-center gap-3">
@@ -205,24 +227,28 @@ export default function Drinks() {
                   <TableCell className="text-right font-medium">
                     {product.price.toLocaleString('pt-MZ')} MT
                   </TableCell>
-                  <TableCell className="text-right text-muted-foreground">
-                    {product.costPrice != null ? `${product.costPrice.toLocaleString('pt-MZ')} MT` : '—'}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {product.costPrice != null ? (
-                      <Badge className={cn(
-                        (product.price - product.costPrice) / product.price >= 0.3
-                          ? 'bg-success/10 text-success hover:bg-success/20'
-                          : (product.price - product.costPrice) / product.price >= 0.1
-                          ? 'bg-warning/10 text-warning hover:bg-warning/20'
-                          : 'bg-destructive/10 text-destructive hover:bg-destructive/20'
-                      )}>
-                        {(((product.price - product.costPrice) / product.price) * 100).toFixed(0)}%
-                      </Badge>
-                    ) : (
-                      <span className="text-muted-foreground text-xs">—</span>
-                    )}
-                  </TableCell>
+                  {canSeeCost && (
+                    <>
+                      <TableCell className="text-right text-muted-foreground">
+                        {product.realUnitCost > 0
+                          ? `${product.realUnitCost.toLocaleString('pt-MZ', { maximumFractionDigits: 2 })} MT${product.fracionavel ? ' /dose' : ''}`
+                          : '—'}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {product.realUnitCost > 0 && product.price > 0 ? (
+                          <Badge className={cn(
+                            product.marginPct >= 30 ? 'bg-success/10 text-success hover:bg-success/20' :
+                            product.marginPct >= 10 ? 'bg-warning/10 text-warning hover:bg-warning/20' :
+                            'bg-destructive/10 text-destructive hover:bg-destructive/20'
+                          )}>
+                            {product.marginPct.toFixed(0)}%
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
+                      </TableCell>
+                    </>
+                  )}
                   <TableCell className="text-right">
                     {product.fracionavel && product.precoDose ? (
                       <span className="text-xs text-muted-foreground">
@@ -245,15 +271,19 @@ export default function Drinks() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
-                      <Button variant="ghost" size="icon-sm" onClick={() => handleEditRecipe(product)} title="Editar Receita">
-                        <ChefHat className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon-sm" onClick={() => handleEdit(product)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon-sm" onClick={() => handleDelete(product)} className="text-destructive hover:text-destructive">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {canEdit && (
+                        <>
+                          <Button variant="ghost" size="icon-sm" onClick={() => handleEditRecipe(product)} title="Editar Receita">
+                            <ChefHat className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon-sm" onClick={() => handleEdit(product)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon-sm" onClick={() => handleDelete(product)} className="text-destructive hover:text-destructive">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

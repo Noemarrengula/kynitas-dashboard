@@ -4,7 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { formatCurrency } from '@/lib/utils';
-import { Banknote, CreditCard, Smartphone } from 'lucide-react';
+import { Banknote, CreditCard, Smartphone, Gift, X, Loader2 } from 'lucide-react';
+import { useBusiness } from '@/contexts/BusinessContext';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 interface PaymentModalProps {
   open: boolean;
@@ -15,11 +17,13 @@ interface PaymentModalProps {
     mpesa: number;
     emola: number;
     card: number;
+    customerId?: string;
   }) => void;
   onCredit?: (customerName: string) => void;
 }
 
 const PaymentModal = memo(function PaymentModal({ open, onClose, totalAmount, onConfirm, onCredit }: PaymentModalProps) {
+  const { business } = useBusiness();
   const [cash, setCash] = useState('');
   const [mpesa, setMpesa] = useState('');
   const [emola, setEmola] = useState('');
@@ -27,6 +31,12 @@ const PaymentModal = memo(function PaymentModal({ open, onClose, totalAmount, on
   const [isCredit, setIsCredit] = useState(false);
   const [customerName, setCustomerName] = useState('');
   const [error, setError] = useState('');
+
+  // Fidelidade: pesquisa de cliente por telefone/nome
+  const [selectedCustomer, setSelectedCustomer] = useState<{ id: string; name: string; phone: string; loyalty_points: number } | null>(null);
+  const [customerQuery, setCustomerQuery] = useState('');
+  const [searchingCustomer, setSearchingCustomer] = useState(false);
+  const [customerResults, setCustomerResults] = useState<Array<{ id: string; name: string; phone: string; loyalty_points: number }>>([]);
 
   const cashValue = parseFloat(cash) || 0;
   const mpesaValue = parseFloat(mpesa) || 0;
@@ -44,9 +54,29 @@ const PaymentModal = memo(function PaymentModal({ open, onClose, totalAmount, on
         mpesa: mpesaValue,
         emola: emolaValue,
         card: cardValue,
+        customerId: selectedCustomer?.id ?? undefined,
       });
       handleReset();
     }
+  };
+
+  const searchCustomers = async (query: string) => {
+    if (!query.trim() || query.trim().length < 2 || !business?.id || !isSupabaseConfigured()) {
+      setCustomerResults([]);
+      return;
+    }
+    setSearchingCustomer(true);
+    try {
+      const { data } = await supabase
+        .from('customers')
+        .select('id, name, phone, loyalty_points')
+        .eq('business_id', business!.id)
+        .eq('active', true)
+        .or(`phone.ilike.%${query}%,name.ilike.%${query}%`)
+        .limit(5);
+      setCustomerResults(data || []);
+    } catch { setCustomerResults([]); }
+    setSearchingCustomer(false);
   };
 
   const handleCredit = () => {
@@ -68,6 +98,9 @@ const PaymentModal = memo(function PaymentModal({ open, onClose, totalAmount, on
     setCustomerName('');
     setIsCredit(false);
     setError('');
+    setSelectedCustomer(null);
+    setCustomerQuery('');
+    setCustomerResults([]);
   };
 
   const handleClose = () => {
@@ -92,6 +125,53 @@ const PaymentModal = memo(function PaymentModal({ open, onClose, totalAmount, on
           {error && (
             <div className="bg-destructive/10 p-3 rounded-lg border border-destructive/20">
               <p className="text-sm text-destructive">{error}</p>
+            </div>
+          )}
+
+          {!isCredit && (
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Gift className="h-4 w-4 text-primary" />
+                Cliente (fidelidade — opcional)
+              </Label>
+              {selectedCustomer ? (
+                <div className="flex items-center justify-between gap-2 bg-primary/10 p-3 rounded-lg">
+                  <div>
+                    <p className="font-medium text-sm">{selectedCustomer.name}</p>
+                    <p className="text-xs text-muted-foreground">{selectedCustomer.phone} · {selectedCustomer.loyalty_points} pts</p>
+                  </div>
+                  <Button variant="ghost" size="icon" onClick={() => { setSelectedCustomer(null); setCustomerQuery(''); setCustomerResults([]); }}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <Input
+                    type="text"
+                    placeholder="Pesquisar por nome ou telefone..."
+                    value={customerQuery}
+                    onChange={(e) => { setCustomerQuery(e.target.value); searchCustomers(e.target.value); }}
+                  />
+                  {searchingCustomer && (
+                    <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+                  )}
+                  {customerResults.length > 0 && (
+                    <div className="absolute z-10 mt-1 w-full bg-card border rounded-lg shadow-lg overflow-hidden">
+                      {customerResults.map(c => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-muted flex items-center justify-between"
+                          onClick={() => { setSelectedCustomer(c); setCustomerQuery(''); setCustomerResults([]); }}
+                        >
+                          <span className="font-medium">{c.name}</span>
+                          <span className="text-xs text-muted-foreground">{c.phone} · {c.loyalty_points} pts</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -214,7 +294,7 @@ const PaymentModal = memo(function PaymentModal({ open, onClose, totalAmount, on
                 📝 Crédito
               </Button>
             )}
-            {isCredit ? (
+{isCredit ? (
               <>
                 <Button 
                   variant="outline" 
@@ -244,5 +324,5 @@ const PaymentModal = memo(function PaymentModal({ open, onClose, totalAmount, on
       </DialogContent>
     </Dialog>
   );
-};
+});
 export { PaymentModal };

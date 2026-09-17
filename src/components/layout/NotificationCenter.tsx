@@ -65,7 +65,7 @@ export function NotificationCenter() {
           )}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-80 p-0">
+      <DropdownMenuContent align="end" className="w-80 max-w-[calc(100vw-2rem)] p-0">
         <div className="flex items-center justify-between px-3 py-2 border-b">
           <DropdownMenuLabel className="text-xs p-0">Notificações</DropdownMenuLabel>
           {unreadCount > 0 && (

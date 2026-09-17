@@ -3,12 +3,14 @@ import { History, TrendingUp, TrendingDown, Package } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useStore } from '@/store/useStore';
+import { useI18n } from '@/contexts/I18nContext';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
 export default function StockMovements() {
   const { stockMovements, products } = useStore();
+  const { t } = useI18n();
   const [filter, setFilter] = useState<'all' | 'entry' | 'exit'>('all');
 
   const filteredMovements = stockMovements.filter(m => 
@@ -28,7 +30,7 @@ export default function StockMovements() {
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <History className="h-6 w-6 text-primary" />
-          Movimentações de Stock
+          {t('page.stockMovements')}
         </h1>
         <p className="text-muted-foreground">Histórico completo de entradas e saídas</p>
       </div>

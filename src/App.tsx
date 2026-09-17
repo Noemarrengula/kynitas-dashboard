@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { BusinessProvider } from "@/contexts/BusinessContext";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -25,6 +25,8 @@ const Sales = lazy(() => import("@/pages/Sales"));
 const SalesHistory = lazy(() => import("@/pages/SalesHistory"));
 const Invoices = lazy(() => import("@/pages/Invoices"));
 const Tables = lazy(() => import("@/pages/Tables"));
+const KDS = lazy(() => import("@/pages/KDS"));
+const Cashier = lazy(() => import("@/pages/Cashier"));
 const Reports = lazy(() => import("@/pages/Reports"));
 const Customers = lazy(() => import("@/pages/Customers"));
 const Credits = lazy(() => import("@/pages/Credits"));
@@ -65,7 +67,7 @@ function PageLoader() {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <HashRouter>
       <AuthProvider>
         <BusinessProvider>
           <TooltipProvider>
@@ -85,22 +87,24 @@ const App = () => (
                   <Route path="/stock/movements" element={<ErrorBoundary><StockMovements /></ErrorBoundary>} />
                   <Route path="/inventory" element={<ErrorBoundary><Inventory /></ErrorBoundary>} />
                   <Route path="/sales" element={<ErrorBoundary><Sales /></ErrorBoundary>} />
-                  <Route path="/sales/history" element={<ErrorBoundary><SalesHistory /></ErrorBoundary>} />
+                  <Route path="/sales/history" element={<ErrorBoundary><ProtectedRoute requiredFeature="vendas_historico_geral"><SalesHistory /></ProtectedRoute></ErrorBoundary>} />
                   <Route path="/tables" element={<ErrorBoundary><Tables /></ErrorBoundary>} />
-                  <Route path="/reports" element={<ErrorBoundary><Reports /></ErrorBoundary>} />
-                  <Route path="/invoices" element={<ErrorBoundary><Invoices /></ErrorBoundary>} />
+                  <Route path="/kds" element={<ErrorBoundary><KDS /></ErrorBoundary>} />
+                  <Route path="/cashier" element={<ErrorBoundary><ProtectedRoute requiredFeature="caixa_proprio"><Cashier /></ProtectedRoute></ErrorBoundary>} />
+                  <Route path="/reports" element={<ErrorBoundary><ProtectedRoute requiredFeature="relatorios"><Reports /></ProtectedRoute></ErrorBoundary>} />
+                  <Route path="/invoices" element={<ErrorBoundary><ProtectedRoute requiredFeature="facturas"><Invoices /></ProtectedRoute></ErrorBoundary>} />
                   <Route path="/customers" element={<ErrorBoundary><Customers /></ErrorBoundary>} />
                   <Route path="/credits" element={<ErrorBoundary><Credits /></ErrorBoundary>} />
                   <Route path="/credits-vendas" element={<ErrorBoundary><CreditsVendas /></ErrorBoundary>} />
-                  <Route path="/financial" element={<ErrorBoundary><Financial /></ErrorBoundary>} />
-                  <Route path="/employees" element={<ErrorBoundary><Employees /></ErrorBoundary>} />
-                  <Route path="/goals" element={<ErrorBoundary><GoalsPage /></ErrorBoundary>} />
-                  <Route path="/backup" element={<ErrorBoundary><BackupPage /></ErrorBoundary>} />
-                  <Route path="/audit" element={<ErrorBoundary><AuditPage /></ErrorBoundary>} />
-                  <Route path="/executive" element={<ErrorBoundary><ExecutivePage /></ErrorBoundary>} />
-                  <Route path="/iva-report" element={<ErrorBoundary><IvaReportPage /></ErrorBoundary>} />
-                  <Route path="/settings" element={<ErrorBoundary><Settings /></ErrorBoundary>} />
-                  <Route path="/settings/users" element={<ErrorBoundary><ProtectedRoute requireSuperAdmin><Users /></ProtectedRoute></ErrorBoundary>} />
+                  <Route path="/financial" element={<ErrorBoundary><ProtectedRoute requiredFeature="financeiro"><Financial /></ProtectedRoute></ErrorBoundary>} />
+                  <Route path="/employees" element={<ErrorBoundary><ProtectedRoute requiredFeature="funcionarios"><Employees /></ProtectedRoute></ErrorBoundary>} />
+                  <Route path="/goals" element={<ErrorBoundary><ProtectedRoute requiredFeature="metas"><GoalsPage /></ProtectedRoute></ErrorBoundary>} />
+                  <Route path="/backup" element={<ErrorBoundary><ProtectedRoute requiredFeature="backup"><BackupPage /></ProtectedRoute></ErrorBoundary>} />
+                  <Route path="/audit" element={<ErrorBoundary><ProtectedRoute requiredFeature="auditoria"><AuditPage /></ProtectedRoute></ErrorBoundary>} />
+                  <Route path="/executive" element={<ErrorBoundary><ProtectedRoute requiredFeature="relatorios"><ExecutivePage /></ProtectedRoute></ErrorBoundary>} />
+                  <Route path="/iva-report" element={<ErrorBoundary><ProtectedRoute requiredFeature="relatorios"><IvaReportPage /></ProtectedRoute></ErrorBoundary>} />
+                  <Route path="/settings" element={<ErrorBoundary><ProtectedRoute requiredFeature="configuracoes"><Settings /></ProtectedRoute></ErrorBoundary>} />
+                  <Route path="/settings/users" element={<ErrorBoundary><ProtectedRoute requiredFeature="gestao_utilizadores"><Users /></ProtectedRoute></ErrorBoundary>} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>
@@ -108,7 +112,7 @@ const App = () => (
           </TooltipProvider>
         </BusinessProvider>
       </AuthProvider>
-    </BrowserRouter>
+    </HashRouter>
   </QueryClientProvider>
 );
 

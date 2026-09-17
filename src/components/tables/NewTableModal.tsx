@@ -81,5 +81,5 @@ const NewTableModal = memo(function NewTableModal({ open, onClose, onSave, exist
       </DialogContent>
     </Dialog>
   );
-};
+});
 export { NewTableModal };

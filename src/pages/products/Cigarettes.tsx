@@ -21,11 +21,13 @@ import {
 import { Label } from '@/components/ui/label';
 import { useDatabase } from '@/hooks/useDatabase';
 import { toast } from '@/hooks/use-toast';
+import { useI18n } from '@/contexts/I18nContext';
 import { sanitizeSearchQuery } from '@/lib/sanitize';
 import { cn } from '@/lib/utils';
 
 export default function Cigarettes() {
   const { products, addProduct, updateProduct, deleteProduct, loading } = useDatabase();
+  const { t } = useI18n();
   const cigarettes = products.filter(p => p.type === 'cigarette');
   
   const [search, setSearch] = useState('');
@@ -111,7 +113,7 @@ export default function Cigarettes() {
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Cigarette className="h-6 w-6 text-primary" />
-            Cigarros
+            {t('page.cigarettes')}
           </h1>
           <p className="text-muted-foreground">Gerir produtos de tabaco</p>
         </div>

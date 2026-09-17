@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { useSuppliers } from '@/hooks/useSuppliers';
+import { useI18n } from '@/contexts/I18nContext';
 import { toast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
 import { Supplier } from '@/types';
@@ -14,6 +15,7 @@ import { PurchaseOrdersTab } from '@/components/suppliers/PurchaseOrdersTab';
 
 export default function Suppliers() {
   const { suppliers, purchaseOrders, addSupplier, updateSupplier, loading } = useSuppliers();
+  const { t } = useI18n();
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
@@ -94,7 +96,7 @@ export default function Suppliers() {
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Truck className="h-6 w-6 text-primary" />
-            Fornecedores
+            {t('page.suppliers')}
           </h1>
           <p className="text-muted-foreground">Gerir fornecedores e ordens de compra</p>
         </div>

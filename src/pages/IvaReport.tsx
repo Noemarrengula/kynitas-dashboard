@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useStore } from '@/store/useStore';
+import { useI18n } from '@/contexts/I18nContext';
 import { formatCurrency } from '@/lib/utils';
 import { exportTableData } from '@/lib/exportData';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -16,6 +17,7 @@ function getMonthRange(year: number, month: number) {
 
 export default function IvaReport() {
   const { invoices } = useStore();
+  const { t } = useI18n();
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -64,7 +66,7 @@ export default function IvaReport() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Relatório de IVA</h1>
+          <h1 className="text-2xl font-bold">{t('page.ivaReport')}</h1>
           <p className="text-muted-foreground">Mapa mensal de IVA para submissão fiscal</p>
         </div>
         <div className="flex gap-2">

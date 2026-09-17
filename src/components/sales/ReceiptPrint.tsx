@@ -141,5 +141,5 @@ const ReceiptPrint = memo(function ReceiptPrint({ sale, copyType = 'client' }: R
       }}><strong>{lines.join('\n')}</strong></pre>
     </div>
   );
-};
+});
 export { ReceiptPrint };

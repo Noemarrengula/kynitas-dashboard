@@ -71,5 +71,5 @@ const TableManagementModal = memo(function TableManagementModal({ open, onClose,
       </DialogContent>
     </Dialog>
   );
-};
+});
 export { TableManagementModal };

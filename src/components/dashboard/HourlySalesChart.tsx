@@ -22,11 +22,13 @@ export function HourlySalesChart() {
               <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
               <XAxis 
                 dataKey="hour" 
-                tick={{ fontSize: 12 }}
+                tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                stroke="hsl(var(--border))"
                 interval={2}
               />
               <YAxis 
-                tick={{ fontSize: 12 }}
+                tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                stroke="hsl(var(--border))"
                 tickFormatter={(value) => `${value}`}
               />
               <Tooltip
@@ -35,9 +37,10 @@ export function HourlySalesChart() {
                   return [value, 'Vendas'];
                 }}
                 contentStyle={{
-                  backgroundColor: 'hsl(0, 0%, 100%)',
-                  border: '1px solid hsl(330, 10%, 90%)',
+                  backgroundColor: 'hsl(var(--popover))',
+                  border: '1px solid hsl(var(--border))',
                   borderRadius: '8px',
+                  color: 'hsl(var(--popover-foreground))',
                 }}
               />
               <Bar dataKey="sales" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />

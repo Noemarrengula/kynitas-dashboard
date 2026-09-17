@@ -8,6 +8,7 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { CustomerModal } from '@/components/credits/CustomerModal';
 import { PaymentModal } from '@/components/credits/PaymentModal';
 import { useCredits, Customer } from '@/hooks/useCredits';
+import { useI18n } from '@/contexts/I18nContext';
 import { formatCurrency } from '@/lib/utils';
 
 export default function Credits() {
@@ -16,6 +17,7 @@ export default function Credits() {
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const { customers, loading, addCustomer, updateCustomer, registerPayment } = useCredits();
+  const { t } = useI18n();
 
   const filteredCustomers = useMemo(() => {
     if (!search) return customers;
@@ -73,7 +75,7 @@ export default function Credits() {
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <CreditCard className="h-6 w-6 text-primary" />
-            Gestão de Vales
+            {t('nav.credits')}
           </h1>
           <p className="text-muted-foreground">Controle de crédito e contas fiadas</p>
         </div>

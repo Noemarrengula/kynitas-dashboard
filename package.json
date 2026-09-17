@@ -7,7 +7,7 @@
   "author": "Marrengula IT",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node -e \"require('fs').writeFileSync('dist/index.html', require('fs').readFileSync('dist/index.html','utf8').replace(/ crossorigin(=\"[^\"]*\")?/g,''))\"",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "test": "vitest",
@@ -20,6 +20,7 @@
     "start": "npm run dev"
   },
   "dependencies": {
+    "@capacitor-community/electron": "^5.0.1",
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "^1.2.11",
     "@radix-ui/react-alert-dialog": "^1.1.14",
@@ -54,6 +55,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "date-fns": "^3.6.0",
+    "electron-updater": "^6.8.9",
     "embla-carousel-react": "^8.6.0",
     "input-otp": "^1.4.2",
     "jspdf": "^3.0.4",
@@ -76,6 +78,7 @@
     "zustand": "^5.0.8"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.4.1",
     "@eslint/js": "^9.32.0",
     "@tailwindcss/typography": "^0.5.16",
     "@testing-library/jest-dom": "^6.9.1",
@@ -111,22 +114,29 @@
     },
     "files": [
       "dist/**/*",
+      "electron/**/*",
       "package.json"
     ],
     "extraMetadata": {
-      "main": "dist/index.html"
+      "main": "electron/main.cjs"
     },
     "win": {
       "target": [
         {
-          "target": "portable",
-          "arch": ["x64"]
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
         }
       ],
-      "artifactName": "${productName}-${version}-portable.${ext}"
+      "artifactName": "${productName}-${version}-setup.${ext}"
     },
-    "portable": {
-      "artifactName": "${productName}-${version}-portable.${ext}"
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Marrengula IT ERP"
     }
   }
 }

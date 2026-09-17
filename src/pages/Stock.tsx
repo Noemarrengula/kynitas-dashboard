@@ -31,7 +31,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ProductModal } from '@/components/products/ProductModal';
+import { ForecastSection, type ForecastEntry } from '@/components/stock/ForecastSection';
+import { PageHeader } from '@/components/ui/page-header';
 import { useDatabase } from '@/hooks/useDatabase';
+import { useI18n } from '@/contexts/I18nContext';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -40,7 +43,8 @@ import { exportStockStatusToPDF } from '@/lib/productReports';
 
 export default function Stock() {
   const navigate = useNavigate();
-  const { products, ingredients, updateProduct, loading } = useDatabase();
+  const { products, ingredients, updateProduct, loading, productForecast } = useDatabase();
+  const { t } = useI18n();
   const stockMovements: any[] = [];
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'critical' | 'low' | 'ok'>('all');
@@ -237,35 +241,30 @@ export default function Stock() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Package className="h-6 w-6 text-primary" />
-            Gestão de Stock
-          </h1>
-          <p className="text-muted-foreground">Controlar inventário de produtos</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="gradient" onClick={() => setProductModalOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Novo Produto
+      <PageHeader
+        icon={<Package className="h-6 w-6" />}
+        title={t('nav.stock')}
+        description="Controlar inventário de produtos"
+      >
+        <Button variant="gradient" onClick={() => setProductModalOpen(true)}>
+          <Plus className="h-4 w-4 mr-2" />
+          Novo Produto
+        </Button>
+        {selectedProducts.length > 0 && (
+          <Button onClick={() => openTypeDialog()}>
+            <Tag className="h-4 w-4 mr-2" />
+            Alterar Tipo ({selectedProducts.length})
           </Button>
-          {selectedProducts.length > 0 && (
-            <Button onClick={() => openTypeDialog()}>
-              <Tag className="h-4 w-4 mr-2" />
-              Alterar Tipo ({selectedProducts.length})
-            </Button>
-          )}
-          <Button variant="outline" onClick={() => { exportStockStatusToPDF(products, 'Stock', `stock-${format(new Date(), 'yyyy-MM-dd')}.pdf`); toast({ title: 'Relatório de Stock PDF exportado!' }); }}>
-            <History className="h-4 w-4 mr-2" />
-            Stock PDF
-          </Button>
-          <Button variant="outline" onClick={() => navigate('/stock/movements')}>
-            <History className="h-4 w-4 mr-2" />
-            Ver Movimentações
-          </Button>
-        </div>
-      </div>
+        )}
+        <Button variant="outline" onClick={() => { exportStockStatusToPDF(products, 'Stock', `stock-${format(new Date(), 'yyyy-MM-dd')}.pdf`); toast({ title: 'Relatório de Stock PDF exportado!' }); }}>
+          <History className="h-4 w-4 mr-2" />
+          Stock PDF
+        </Button>
+        <Button variant="outline" onClick={() => navigate('/stock/movements')}>
+          <History className="h-4 w-4 mr-2" />
+          Ver Movimentações
+        </Button>
+      </PageHeader>
 
       {/* Alerts */}
       {criticalCount > 0 && (
@@ -281,6 +280,25 @@ export default function Stock() {
           </div>
         </div>
       )}
+
+      {/* Previsão de Stock */}
+      <ForecastSection
+        title="Previsão de Stock"
+        subtitle="Dias restantes ao ritmo de vendas dos últimos 30 dias"
+        entries={products.map(product => {
+          const f = productForecast[product.id];
+          return {
+            id: product.id,
+            name: product.name,
+            unit: product.type === 'drink' && product.fracionavel ? 'garrafa' : 'un',
+            stock: product.stock ?? 0,
+            avgDailyQty: f?.avgDailyQty ?? 0,
+            daysUntilEmpty: f?.daysUntilEmpty ?? null,
+            needsRestock: f?.needsRestock ?? false,
+            suggestedRestockQty: f?.suggestedRestockQty ?? 0,
+          } as ForecastEntry;
+        })}
+      />
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">

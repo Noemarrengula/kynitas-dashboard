@@ -173,5 +173,5 @@ const CustomerModal = memo(function CustomerModal({ open, onClose, onSave, custo
       </DialogContent>
     </Dialog>
   );
-};
+});
 export { CustomerModal };

@@ -73,6 +73,7 @@ export function useRealtimeSync() {
               table_number: payload.new.table_number,
               table_name: payload.new.table_name,
               table_customer_name: payload.new.table_customer_name,
+              customerId: payload.new.customer_id,
               createdAt: new Date(payload.new.created_at),
             };
             setSales([newSale, ...salesRef.current]);
@@ -90,6 +91,7 @@ export function useRealtimeSync() {
               table_number: payload.new.table_number,
               table_name: payload.new.table_name,
               table_customer_name: payload.new.table_customer_name,
+              customerId: payload.new.customer_id,
               createdAt: new Date(payload.new.created_at),
             };
             setSales(salesRef.current.map(s => s.id === updatedSale.id ? updatedSale : s));

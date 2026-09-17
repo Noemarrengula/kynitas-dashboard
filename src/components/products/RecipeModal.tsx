@@ -139,5 +139,5 @@ const RecipeModal = memo(function RecipeModal({ product, open, onClose }: Recipe
       </DialogContent>
     </Dialog>
   );
-};
+});
 export { RecipeModal };

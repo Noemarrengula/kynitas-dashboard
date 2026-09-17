@@ -19,6 +19,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { useStore } from '@/store/useStore';
 import { useDatabase } from '@/hooks/useDatabase';
 import { useBusiness } from '@/contexts/BusinessContext';
+import { useI18n } from '@/contexts/I18nContext';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/hooks/use-toast';
 import { format, subDays, startOfWeek, startOfMonth, isWithinInterval } from 'date-fns';
@@ -35,6 +36,7 @@ export default function Reports() {
   const { loading, loadAllSales } = useDatabase();
   const { products, sales, credits } = useStore();
   const { business } = useBusiness();
+  const { t } = useI18n();
   const [period, setPeriod] = useState<'day' | 'week' | 'month'>('week');
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'cash' | 'mpesa' | 'emola' | 'card'>('all');
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
@@ -202,7 +204,7 @@ export default function Reports() {
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <BarChart3 className="h-6 w-6 text-primary" />
-            Relatórios
+            {t('nav.reports')}
           </h1>
           <p className="text-muted-foreground">Análise de desempenho do estabelecimento</p>
           {sales.length === 0 && (

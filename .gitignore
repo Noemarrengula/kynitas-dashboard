@@ -32,3 +32,12 @@ dist-ssr
 
 # Release binaries
 release/win-unpacked/
+release/*.exe
+release/*.blockmap
+release/builder-effective-config.yaml
+release/latest.yml
+release/.icon-ico/
+
+# Build artifacts & electron-builder caches
+build/
+win32-x64-template-*/

@@ -1,6 +1,8 @@
 export interface Order {
   id: string;
   tableId: string;
+  tableName?: string;
+  table_number?: number;
   items: OrderItem[];
   status: 'pending' | 'preparing' | 'ready' | 'delivered' | 'paid';
   total: number;

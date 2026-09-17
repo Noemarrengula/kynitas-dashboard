@@ -6,6 +6,7 @@ import { formatCurrency } from '@/lib/utils';
 import { subDays, format, startOfWeek, startOfMonth, isWithinInterval } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, AreaChart, Area } from 'recharts';
+import { useI18n } from '@/contexts/I18nContext';
 
 function movingAverage(data: number[], window: number): number[] {
   const result: number[] = [];
@@ -19,6 +20,7 @@ function movingAverage(data: number[], window: number): number[] {
 
 export default function Executive() {
   const { sales, products } = useStore();
+  const { t } = useI18n();
 
   const analysis = useMemo(() => {
     const today = new Date();
@@ -73,7 +75,7 @@ export default function Executive() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Executivo</h1>
+        <h1 className="text-2xl font-bold">{t('nav.executive')}</h1>
         <p className="text-muted-foreground">Previsões, tendências e indicadores</p>
       </div>
 

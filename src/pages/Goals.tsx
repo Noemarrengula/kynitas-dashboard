@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { useBusinessGoals, BusinessGoal } from '@/hooks/useBusinessGoals';
+import { useI18n } from '@/contexts/I18nContext';
 import { formatCurrency } from '@/lib/receipt';
 
 const typeLabels: Record<string, string> = {
@@ -32,6 +33,7 @@ const statusConfig: Record<string, { label: string; color: string; bar: string }
 
 export default function Goals() {
   const { goals, loading, createGoal, updateGoal, deleteGoal } = useBusinessGoals();
+  const { t } = useI18n();
   const [showDialog, setShowDialog] = useState(false);
   const [editingGoal, setEditingGoal] = useState<BusinessGoal | null>(null);
   const [form, setForm] = useState({
@@ -77,7 +79,7 @@ export default function Goals() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Metas</h1>
+          <h1 className="text-2xl font-bold">{t('nav.goals')}</h1>
           <p className="text-muted-foreground">Acompanhe o progresso dos seus objectivos</p>
         </div>
         <Button onClick={openCreate}>

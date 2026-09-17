@@ -77,14 +77,6 @@ export function useCredits() {
   const customersRef = useRef(customers);
   customersRef.current = customers;
 
-  useEffect(() => {
-    if (!currentBusiness?.id) {
-      setLoading(false);
-      return;
-    }
-    loadData();
-  }, [currentBusiness?.id, loadData]);
-
   const loadData = useCallback(async () => {
     if (!currentBusiness?.id) return;
 
@@ -116,6 +108,14 @@ export function useCredits() {
       setLoading(false);
     }
   }, [currentBusiness?.id]);
+
+  useEffect(() => {
+    if (!currentBusiness?.id) {
+      setLoading(false);
+      return;
+    }
+    loadData();
+  }, [currentBusiness?.id, loadData]);
 
   const addCustomer = useCallback(async (customer: Omit<Customer, 'id' | 'businessId' | 'createdAt' | 'updatedAt'>) => {
     try {

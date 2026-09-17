@@ -4,12 +4,17 @@ import { useBusiness } from '@/contexts/BusinessContext';
 import { useToast } from '@/hooks/use-toast';
 import { useAuditLog } from './useAuditLog';
 import { useStore } from '@/store/useStore';
+import { getOnline, enqueuePendingSale, writeCache, readCache } from '@/lib/offline';
 import { Product, Ingredient, Sale, Credit } from '@/types';
 
 interface DatabaseError {
   message: string;
   code?: string;
   details?: string;
+}
+
+function isNetworkError(msg?: string): boolean {
+  return /fetch|network|offline|failed to fetch/i.test(msg || '');
 }
 
 // Mapeamento snake_case (DB) ↔ camelCase (TypeScript)
@@ -45,6 +50,8 @@ const DB_FIELD_MAP: Record<string, string> = {
   tableCustomerName: 'table_customer_name',
   customer_name: 'customerName',
   customerName: 'customer_name',
+  customer_id: 'customerId',
+  customerId: 'customer_id',
   customer_phone: 'customerPhone',
   customerPhone: 'customer_phone',
   amount_paid: 'amountPaid',
@@ -110,6 +117,128 @@ export function useDatabase() {
     return { error: errorObj };
   }, []);
 
+  // Semear estado a partir da cache local (offline). Devolve true se encontrou dados.
+  const seedFromCache = (businessId: string): boolean => {
+    const productsCache = readCache<Record<string, any>[]>(businessId, 'products');
+    const ingredientsCache = readCache<Record<string, any>[]>(businessId, 'ingredients');
+    const salesCache = readCache<Record<string, any>[]>(businessId, 'sales');
+    const creditsCache = readCache<Record<string, any>[]>(businessId, 'credits');
+
+    if (
+      (productsCache?.rows.length || 0) +
+      (ingredientsCache?.rows.length || 0) +
+      (salesCache?.rows.length || 0) +
+      (creditsCache?.rows.length || 0) === 0
+    ) {
+      return false;
+    }
+
+    if (productsCache?.rows) {
+      useStore.getState().setProducts(productsCache.rows.map(p => toCamelCase(p) as Product));
+    }
+    if (ingredientsCache?.rows) {
+      useStore.getState().setIngredients(ingredientsCache.rows.map(i => toCamelCase(i) as Ingredient));
+    }
+    if (salesCache?.rows) {
+      const transformedSales = salesCache.rows.map(sale => ({
+        ...toCamelCase(sale),
+        paymentDetails: sale.payment_details || {},
+        createdAt: sale.created_at,
+      }));
+      useStore.getState().setSales(transformedSales as unknown as Sale[]);
+    }
+    if (creditsCache?.rows) {
+      const transformedCredits: Credit[] = creditsCache.rows.map(credit => ({
+        id: credit.id,
+        customerName: credit.customer_name,
+        customerPhone: credit.customer_phone,
+        items: credit.items,
+        total: credit.total,
+        amountPaid: credit.amount_paid || 0,
+        remainingBalance: credit.remaining_balance,
+        status: credit.status,
+        createdAt: credit.created_at,
+        updatedAt: credit.updated_at,
+        lastPaymentAt: credit.last_payment_at,
+        notes: credit.notes,
+        saleId: credit.sale_id,
+      }));
+      useStore.getState().setCredits(transformedCredits);
+    }
+
+    return true;
+  };
+
+  // Dedução de stock local (mesma lógica nos caminhos online e offline)
+  const applyLocalStockDeduction = (sale: Omit<Sale, 'id'>) => {
+    const updatedProducts = useStore.getState().products.map(product => {
+      const saleItems = sale.items.filter(item => item.productId === product.id);
+      if (saleItems.length === 0) return product;
+
+      let totalDeduction = 0;
+      saleItems.forEach(item => {
+        const isDose = item.product?.name?.includes('(Dose)') || false;
+        if (isDose && product.dosesPorGarrafa && product.dosesPorGarrafa > 0) {
+          totalDeduction += item.quantity / product.dosesPorGarrafa;
+        } else {
+          totalDeduction += item.quantity;
+        }
+      });
+
+      return { ...product, stock: Math.max(0, product.stock - totalDeduction) };
+    });
+    useStore.getState().setProducts(updatedProducts);
+  };
+
+  // Guarda venda apenas localmente (offline) e coloca na fila de sincronização
+  const saveSaleOffline = (sale: Omit<Sale, 'id'>) => {
+    if (!currentBusiness?.id) {
+      return { data: null, error: { message: 'Negócio não encontrado' } };
+    }
+
+    const tempId = `offline-${Date.now()}`;
+    const saleNumber = (useStore.getState().sales.length || 0) + 1;
+
+    const transformedSale: Sale = {
+      id: tempId,
+      saleNumber,
+      items: sale.items,
+      total: sale.total,
+      paymentDetails: sale.paymentDetails || {},
+      tableId: sale.tableId,
+      table_number: sale.table_number,
+      table_name: sale.table_name,
+      table_customer_name: sale.table_customer_name,
+      customerId: sale.customerId,
+      createdAt: new Date(),
+    };
+
+    enqueuePendingSale(currentBusiness.id, {
+      id: tempId,
+      businessId: currentBusiness.id,
+      saleNumber,
+      items: sale.items,
+      total: sale.total,
+      paymentDetails: sale.paymentDetails || {},
+      tableId: sale.tableId,
+      table_number: sale.table_number,
+      table_name: sale.table_name,
+      table_customer_name: sale.table_customer_name,
+      customerId: sale.customerId,
+      queuedAt: new Date().toISOString(),
+    });
+
+    useStore.getState().addSale(transformedSale);
+    applyLocalStockDeduction(sale);
+
+    toast({
+      title: 'Venda guardada offline',
+      description: `Será sincronizada quando houver ligação (nº ${saleNumber})`,
+    });
+
+    return { data: transformedSale, error: null };
+  };
+
   // Carregar dados iniciais com retry
   useEffect(() => {
     if (!currentBusiness?.id) {
@@ -122,6 +251,13 @@ export function useDatabase() {
       try {
         setLoading(true);
         setError(null);
+
+        // Modo offline: sem rede, semeia a partir da cache local
+        if (!getOnline()) {
+          const seeded = seedFromCache(currentBusiness.id);
+          setLoading(false);
+          if (seeded) return;
+        }
 
         const [productsRes, ingredientsRes, salesRes, creditsRes] = await Promise.all([
             supabase.from('products').select('*').eq('business_id', currentBusiness.id),
@@ -176,6 +312,12 @@ export function useDatabase() {
           useStore.getState().setCredits(transformedCredits);
         }
 
+        // Guardar snapshot local (oferece dados quando offline)
+        writeCache(currentBusiness.id, 'products', productsRes.data || []);
+        writeCache(currentBusiness.id, 'ingredients', ingredientsRes.data || []);
+        writeCache(currentBusiness.id, 'sales', salesRes.data || []);
+        writeCache(currentBusiness.id, 'credits', creditsRes.data || []);
+
         // Se chegou aqui, funcionou
         setLoading(false);
         setRetryCount(0);
@@ -188,6 +330,13 @@ export function useDatabase() {
           setRetryCount(attempt + 1);
           setTimeout(() => loadData(attempt + 1), 2000 * (attempt + 1)); // Backoff exponencial
         } else {
+          // Falhou por rede: tentar ultima snapshot local
+          const seeded = seedFromCache(currentBusiness.id);
+          if (seeded) {
+            setLoading(false);
+            setError(null);
+            return;
+          }
           handleError(err, 'LOAD_DATA');
           setLoading(false);
         }
@@ -373,6 +522,11 @@ export function useDatabase() {
       if (!currentBusiness?.id) {
         throw new Error('Negócio não encontrado. Faça login novamente.');
       }
+
+      // Sem ligação → guarda localmente e agenda sincronização
+      if (!getOnline()) {
+        return saveSaleOffline(sale);
+      }
       
       console.log('[ADD_SALE] Iniciando inserção com dados:', {
         business_id: currentBusiness.id,
@@ -400,12 +554,16 @@ export function useDatabase() {
           table_number: sale.table_number || null,
           table_name: sale.table_name || null,
           table_customer_name: sale.table_customer_name || null,
+          customer_id: sale.customerId || null,
         })
         .select()
         .single();
 
       if (error) {
         console.error('[ADD_SALE] Erro na inserção:', error);
+        if (isNetworkError(error.message)) {
+          return saveSaleOffline(sale);
+        }
         throw error;
       }
 
@@ -421,6 +579,7 @@ export function useDatabase() {
         table_number: data.table_number,
         table_name: data.table_name,
         table_customer_name: data.table_customer_name,
+        customerId: data.customer_id,
         createdAt: data.created_at,
       };
       
@@ -428,23 +587,7 @@ export function useDatabase() {
       auditLog('sale', 'sales', data.id, { total: sale.total, paymentMethod: sale.paymentDetails?.method });
 
       // Atualizar stock localmente
-      const updatedProducts = useStore.getState().products.map(product => {
-        const saleItems = sale.items.filter(item => item.productId === product.id);
-        if (saleItems.length === 0) return product;
-
-        let totalDeduction = 0;
-        saleItems.forEach(item => {
-          const isDose = item.product?.name?.includes('(Dose)') || false;
-          if (isDose && product.dosesPorGarrafa && product.dosesPorGarrafa > 0) {
-            totalDeduction += item.quantity / product.dosesPorGarrafa;
-          } else {
-            totalDeduction += item.quantity;
-          }
-        });
-
-        return { ...product, stock: Math.max(0, product.stock - totalDeduction) };
-      });
-      useStore.getState().setProducts(updatedProducts);
+      applyLocalStockDeduction(sale);
 
       return { data: transformedSale, error: null };
     } catch (err: unknown) {
@@ -661,6 +804,22 @@ export function useDatabase() {
     }
   };
 
+  // Custo real por unidade: prato = soma da ficha técnica; bebida dose = costPrice / doses
+  const computeRealUnitCost = useCallback((product: Product): number => {
+    if (product.type === 'meal' && product.recipe && product.recipe.length > 0) {
+      const recipeCost = product.recipe.reduce((sum, item) => {
+        const ingredient = ingredients.find(i => i.id === item.ingredientId);
+        return sum + (ingredient ? (ingredient.costPerUnit || 0) * item.quantity : 0);
+      }, 0);
+      if (recipeCost > 0) return recipeCost;
+      return product.costPrice ?? product.estimatedCost ?? 0;
+    }
+    if (product.type === 'drink' && product.fracionavel && product.dosesPorGarrafa && product.dosesPorGarrafa > 0) {
+      return (product.costPrice ?? 0) / product.dosesPorGarrafa;
+    }
+    return product.costPrice ?? product.estimatedCost ?? 0;
+  }, [ingredients]);
+
   // Calcular vendas por produto
   const salesByProduct = useMemo(() => {
     const salesMap: Record<string, { totalSales: number; totalRevenue: number }> = {};
@@ -702,6 +861,143 @@ export function useDatabase() {
 
     return stockMap;
   }, [products, ingredients]);
+
+  // Lucro e margem por produto (custo real descontado das vendas)
+  const profitByProduct = useMemo(() => {
+    const map: Record<string, {
+      totalSales: number;
+      totalRevenue: number;
+      realUnitCost: number;
+      totalCost: number;
+      grossProfit: number;
+      marginPct: number;
+      foodCostPct: number;
+    }> = {};
+
+    products.forEach(product => {
+      const unitCost = computeRealUnitCost(product);
+      const sale = salesByProduct[product.id] || { totalSales: 0, totalRevenue: 0 };
+      const { totalSales, totalRevenue } = sale;
+      const totalCost = unitCost * totalSales;
+      const grossProfit = totalRevenue - totalCost;
+      map[product.id] = {
+        totalSales,
+        totalRevenue,
+        realUnitCost: unitCost,
+        totalCost,
+        grossProfit,
+        marginPct: totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0,
+        foodCostPct: totalRevenue > 0 ? (totalCost / totalRevenue) * 100 : 0,
+      };
+    });
+
+    return map;
+  }, [products, salesByProduct, computeRealUnitCost]);
+
+  // PREVISÃO DE STOCK (últimos 30 dias)
+  const FORECAST_DAYS = 30;
+  const forecastCutoff = Date.now() - FORECAST_DAYS * 24 * 60 * 60 * 1000;
+
+  // Consumo médio diário por produto (garrafas/doses/cigarros/unidades)
+  const productForecast = useMemo(() => {
+    const consumed: Record<string, number> = {};
+
+    sales.forEach(sale => {
+      const ts = new Date(sale.createdAt).getTime();
+      if (Number.isNaN(ts) || ts < forecastCutoff) return;
+      sale.items.forEach(item => {
+        consumed[item.productId] = (consumed[item.productId] || 0) + item.quantity;
+      });
+    });
+
+    const map: Record<string, {
+      avgDailyQty: number;
+      daysUntilEmpty: number | null;
+      needsRestock: boolean;
+      suggestedRestockQty: number;
+      dailyConsumption: number;
+    }> = {};
+
+    products.forEach(product => {
+      const totalConsumed = consumed[product.id] || 0;
+      const avgDailyQty = totalConsumed / FORECAST_DAYS;
+      const stock = product.stock ?? 0;
+
+      let daysUntilEmpty: number | null = null;
+      if (avgDailyQty > 0) {
+        daysUntilEmpty = stock <= 0 ? 0 : Math.floor(stock / avgDailyQty);
+      } else if (stock > 0) {
+        daysUntilEmpty = null; // sem vendas, não se esgota pelos dados
+      }
+
+      const needsRestock = stock <= 0 || (daysUntilEmpty !== null && daysUntilEmpty < 7);
+      const suggestedRestockQty = avgDailyQty > 0 ? Math.max(0, Math.ceil(avgDailyQty * 7) - stock) : 0;
+
+      map[product.id] = {
+        avgDailyQty,
+        daysUntilEmpty,
+        needsRestock,
+        suggestedRestockQty,
+        dailyConsumption: totalConsumed,
+      };
+    });
+
+    return map;
+  }, [sales, products]);
+
+  // Consumo médio diário por ingrediente (via fichas técnicas das refeições vendidas)
+  const ingredientForecast = useMemo(() => {
+    const consumed: Record<string, number> = {};
+
+    sales.forEach(sale => {
+      const ts = new Date(sale.createdAt).getTime();
+      if (Number.isNaN(ts) || ts < forecastCutoff) return;
+      sale.items.forEach(item => {
+        const product = products.find(p => p.id === item.productId);
+        if (!product?.recipe || !Array.isArray(product.recipe)) return;
+        product.recipe.forEach(recipeItem => {
+          consumed[recipeItem.ingredientId] = (consumed[recipeItem.ingredientId] || 0) + recipeItem.quantity * item.quantity;
+        });
+      });
+    });
+
+    const map: Record<string, {
+      avgDailyQty: number;
+      daysUntilEmpty: number | null;
+      needsRestock: boolean;
+      suggestedRestockQty: number;
+      dailyConsumption: number;
+    }> = {};
+
+    ingredients.forEach(ingredient => {
+      const totalConsumed = consumed[ingredient.id] || 0;
+      const avgDailyQty = totalConsumed / FORECAST_DAYS;
+      const stock = ingredient.stock ?? 0;
+      const belowMin = stock <= ingredient.minStock;
+
+      let daysUntilEmpty: number | null = null;
+      if (avgDailyQty > 0) {
+        daysUntilEmpty = stock <= 0 ? 0 : Math.floor(stock / avgDailyQty);
+      } else if (stock > 0) {
+        daysUntilEmpty = null;
+      }
+
+      const needsRestock = stock <= 0 || belowMin || (daysUntilEmpty !== null && daysUntilEmpty < 7);
+      const suggestedRestockQty = avgDailyQty > 0
+        ? Math.max(ingredient.minStock, Math.ceil(avgDailyQty * 7)) - stock
+        : Math.max(0, ingredient.minStock - stock);
+
+      map[ingredient.id] = {
+        avgDailyQty,
+        daysUntilEmpty,
+        needsRestock,
+        suggestedRestockQty,
+        dailyConsumption: totalConsumed,
+      };
+    });
+
+    return map;
+  }, [sales, products, ingredients]);
 
   // Função para carregar todas as vendas (sem filtro de data)
   const loadAllSales = useCallback(async () => {
@@ -747,6 +1043,9 @@ export function useDatabase() {
     credits,
     salesByProduct,
     stockByMeal,
+    profitByProduct,
+    productForecast,
+    ingredientForecast,
     addProduct,
     updateProduct,
     deleteProduct,
