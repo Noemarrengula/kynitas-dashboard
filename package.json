@@ -7,7 +7,7 @@
   "author": "Marrengula IT",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node -e \"require('fs').writeFileSync('dist/index.html', require('fs').readFileSync('dist/index.html','utf8').replace(/ crossorigin(=\"[^\"]*\")?/g,''))\"",
+    "build": "vite build && node scripts/postbuild.cjs",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "test": "vitest",
