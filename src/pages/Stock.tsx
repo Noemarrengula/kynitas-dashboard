@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Package, AlertTriangle, Plus, Minus, History, Edit, DollarSign, Tag } from 'lucide-react';
+import { Package, AlertTriangle, Plus, Minus, History, Edit, DollarSign, Tag, ShoppingCart } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { sanitizeSearchQuery } from '@/lib/sanitize';
 import { Button } from '@/components/ui/button';
@@ -43,9 +43,8 @@ import { exportStockStatusToPDF } from '@/lib/productReports';
 
 export default function Stock() {
   const navigate = useNavigate();
-  const { products, ingredients, updateProduct, loading, productForecast } = useDatabase();
+  const { products, ingredients, updateProduct, loading, productForecast, recordStockMovement, stockMovements } = useDatabase();
   const { t } = useI18n();
-  const stockMovements: any[] = [];
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'critical' | 'low' | 'ok'>('all');
   const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
@@ -221,6 +220,19 @@ export default function Stock() {
     }
 
     updateProduct(selectedProductId, { stock: newStock });
+
+    if (adjustmentType === 'entry') {
+      recordStockMovement({ productId: selectedProductId, type: 'entry', quantity, reason: 'Entrada de stock (ajuste manual)' });
+    } else if (adjustmentType === 'exit') {
+      recordStockMovement({ productId: selectedProductId, type: 'exit', quantity, reason: 'Saída de stock (ajuste manual)' });
+    } else {
+      const delta = newStock - product.stock;
+      if (delta > 0) {
+        recordStockMovement({ productId: selectedProductId, type: 'entry', quantity: delta, reason: 'Ajuste manual de stock' });
+      } else if (delta < 0) {
+        recordStockMovement({ productId: selectedProductId, type: 'exit', quantity: -delta, reason: 'Ajuste manual de stock' });
+      }
+    }
 
     toast({
       title: 'Stock atualizado',
@@ -493,6 +505,18 @@ export default function Stock() {
                         aria-label="Saída de stock"
                       >
                         <Minus className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate('/compras/nova', {
+                          state: { items: [{ id: product.id, type: 'product', suggestedQty: Math.max(1, productForecast[product.id]?.suggestedRestockQty || 1) }] },
+                        })}
+                        className="text-primary hover:text-primary"
+                        title="Comprar agora"
+                        aria-label="Comprar agora"
+                      >
+                        <ShoppingCart className="h-4 w-4" />
                       </Button>
                     </div>
                   </TableCell>

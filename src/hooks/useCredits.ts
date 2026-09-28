@@ -12,10 +12,16 @@ export interface Customer {
   phone?: string;
   email?: string;
   address?: string;
+  nuit?: string;
   creditLimit: number;
   currentBalance: number;
   status: 'active' | 'blocked' | 'inactive';
   notes?: string;
+  loyaltyPoints?: number;
+  totalSpent?: number;
+  visitCount?: number;
+  lastVisitAt?: string;
+  active?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -31,6 +37,7 @@ export interface CreditTransaction {
   saleId?: string;
   paymentMethod?: string;
   description?: string;
+  reference?: string;
   createdAt: string;
 }
 
@@ -42,10 +49,16 @@ function toCustomer(db: any): Customer {
     phone: db.phone,
     email: db.email,
     address: db.address,
+    nuit: db.nuit,
     creditLimit: db.credit_limit ?? 0,
     currentBalance: db.current_balance ?? 0,
     status: db.status,
     notes: db.notes,
+    loyaltyPoints: db.loyalty_points ?? 0,
+    totalSpent: db.total_spent ?? 0,
+    visitCount: db.visit_count ?? 0,
+    lastVisitAt: db.last_visit_at,
+    active: db.active ?? true,
     createdAt: db.created_at,
     updatedAt: db.updated_at,
   };
@@ -63,6 +76,7 @@ function toCreditTransaction(db: any): CreditTransaction {
     saleId: db.sale_id,
     paymentMethod: db.payment_method,
     description: db.description,
+    reference: db.reference,
     createdAt: db.created_at,
   };
 }
@@ -126,6 +140,7 @@ export function useCredits() {
           phone: customer.phone,
           email: customer.email,
           address: customer.address,
+          nuit: customer.nuit,
           credit_limit: customer.creditLimit ?? 0,
           current_balance: customer.currentBalance ?? 0,
           status: customer.status || 'active',
@@ -159,6 +174,7 @@ export function useCredits() {
       if (updates.phone !== undefined) dbUpdates.phone = updates.phone;
       if (updates.email !== undefined) dbUpdates.email = updates.email;
       if (updates.address !== undefined) dbUpdates.address = updates.address;
+      if (updates.nuit !== undefined) dbUpdates.nuit = updates.nuit;
       if (updates.creditLimit !== undefined) dbUpdates.credit_limit = updates.creditLimit;
       if (updates.currentBalance !== undefined) dbUpdates.current_balance = updates.currentBalance;
       if (updates.status !== undefined) dbUpdates.status = updates.status;
@@ -193,7 +209,9 @@ export function useCredits() {
     customerId: string,
     amount: number,
     paymentMethod: string,
-    description?: string
+    description?: string,
+    reference?: string,
+    paymentDate?: string
   ) => {
     try {
       const { data, error } = await supabase.rpc('register_credit_payment', {
@@ -201,7 +219,9 @@ export function useCredits() {
         p_customer_id: customerId,
         p_amount: amount,
         p_payment_method: paymentMethod,
-        p_description: description
+        p_description: description,
+        p_reference: reference,
+        p_payment_date: paymentDate
       });
 
       if (error) throw error;
@@ -308,6 +328,27 @@ export function useCredits() {
     }
   }, []);
 
+  const getDebtSummary = useCallback(async () => {
+    if (!currentBusiness?.id) return [];
+    try {
+      const { data, error } = await supabase
+        .from('customer_debt_summary')
+        .select('*')
+        .eq('business_id', currentBusiness.id)
+        .order('current_balance', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error: unknown) {
+      toast({
+        title: 'Erro ao carregar dívidas',
+        description: getErrorMessage(error),
+        variant: 'destructive',
+      });
+      return [];
+    }
+  }, [currentBusiness?.id, toast]);
+
   return {
     customers,
     transactions,
@@ -317,6 +358,7 @@ export function useCredits() {
     registerPayment,
     registerCreditCharge,
     getCustomerTransactions,
+    getDebtSummary,
     refreshData: loadData,
   };
 }

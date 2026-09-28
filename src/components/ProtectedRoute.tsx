@@ -3,16 +3,18 @@ import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { Loader2 } from 'lucide-react';
-import type { Feature } from '@/hooks/usePermissions';
+import type { Feature, Permission } from '@/hooks/usePermissions';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requiredFeature?: Feature;
+  requiredPermission?: Permission;
 }
 
 export function ProtectedRoute({
   children,
   requiredFeature,
+  requiredPermission,
 }: ProtectedRouteProps) {
   const { user, loading: authLoading } = useAuth();
   const { loading: businessLoading } = useBusiness();
@@ -30,7 +32,7 @@ export function ProtectedRoute({
     return <Navigate to="/login" replace />;
   }
 
-  if (requiredFeature && !can(requiredFeature)) {
+  if ((requiredFeature && !can(requiredFeature)) || (requiredPermission && !can(requiredPermission))) {
     return <Navigate to="/dashboard" replace />;
   }
 

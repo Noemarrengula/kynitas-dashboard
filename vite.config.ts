@@ -6,8 +6,11 @@ import path from "path";
 export default defineConfig(({ mode }) => ({
   base: './',
   server: {
-    host: "::",
+    host: true,
     port: 8080,
+    hmr: {
+      clientPort: 8080,
+    },
   },
   build: {
     rollupOptions: {

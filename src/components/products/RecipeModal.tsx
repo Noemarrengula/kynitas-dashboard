@@ -1,4 +1,4 @@
-import { useState, memo } from 'react';
+import { useState, memo, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,7 @@ import { useStore } from '@/store/useStore';
 import { Product, RecipeItem } from '@/types';
 import { Plus, X } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { formatCurrency } from '@/lib/utils';
 
 interface RecipeModalProps {
   product: Product | null;
@@ -18,6 +19,20 @@ interface RecipeModalProps {
 const RecipeModal = memo(function RecipeModal({ product, open, onClose }: RecipeModalProps) {
   const { ingredients, updateProduct } = useStore();
   const [recipe, setRecipe] = useState<RecipeItem[]>(product?.recipe || []);
+
+  useEffect(() => {
+    if (open) {
+      setRecipe(product?.recipe || []);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, product?.id]);
+
+  const costByLine = (item: RecipeItem) => {
+    const ingredient = ingredients.find(i => i.id === item.ingredientId);
+    return ingredient ? (ingredient.costPerUnit || 0) * item.quantity : 0;
+  };
+
+  const totalCost = recipe.reduce((sum, item) => sum + costByLine(item), 0);
 
   const handleAddIngredient = () => {
     setRecipe([...recipe, { ingredientId: '', quantity: 0, unit: '' }]);
@@ -109,6 +124,13 @@ const RecipeModal = memo(function RecipeModal({ product, open, onClose }: Recipe
                     <Input value={item.unit} disabled className="bg-muted" />
                   </div>
 
+                  <div className="w-28 text-right">
+                    <Label>Custo/linha</Label>
+                    <p className="text-sm font-medium bg-muted rounded-md h-10 flex items-center justify-end pr-3 mt-1 truncate">
+                      {costByLine(item) > 0 ? formatCurrency(costByLine(item)) : '—'}
+                    </p>
+                  </div>
+
                   <Button
                     variant="ghost"
                     size="icon"
@@ -126,6 +148,13 @@ const RecipeModal = memo(function RecipeModal({ product, open, onClose }: Recipe
             <Plus className="h-4 w-4 mr-2" />
             Adicionar Ingrediente
           </Button>
+
+          {totalCost > 0 && (
+            <div className="flex items-center justify-between bg-muted rounded-lg px-4 py-3">
+              <span className="text-sm text-muted-foreground">Custo estimado da ficha técnica</span>
+              <span className="font-semibold">{formatCurrency(totalCost)}</span>
+            </div>
+          )}
         </div>
 
         <DialogFooter>

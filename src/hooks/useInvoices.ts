@@ -11,6 +11,7 @@ function toInvoice(db: any): Invoice {
     id: db.id,
     businessId: db.business_id,
     saleId: db.sale_id,
+    originalInvoiceId: db.original_invoice_id,
     documentType: db.document_type,
     series: db.series,
     number: db.number,
@@ -53,6 +54,12 @@ function toInvoiceSeries(db: any): InvoiceSeries {
     createdAt: db.created_at,
     updatedAt: db.updated_at,
   };
+}
+
+function upsertInvoiceInStore(invoice: Invoice) {
+  useStore.getState().setInvoices(
+    [invoice, ...useStore.getState().invoices.filter(i => i.id !== invoice.id)]
+  );
 }
 
 export function useInvoices() {
@@ -108,78 +115,64 @@ export function useInvoices() {
     if (!currentBusiness?.id) return { data: null, error: 'Negócio não encontrado' };
 
     try {
-      const { data: sale, error: saleError } = await supabase
-        .from('sales')
-        .select('*')
-        .eq('id', saleId)
-        .single();
+      const { data, error } = await supabase.rpc('issue_invoice', {
+        p_business_id: currentBusiness.id,
+        p_sale_id: saleId,
+        p_document_type: documentType,
+        p_client_name: clientInfo?.name || null,
+        p_client_nuit: clientInfo?.nuit || null,
+        p_client_address: clientInfo?.address || null,
+      });
 
-      if (saleError || !sale) return { data: null, error: 'Venda não encontrada' };
+      if (error) throw error;
 
-      const seriesList = useStore.getState().invoiceSeries;
-      const series = seriesList.find(s => s.documentType === documentType && s.active);
-      if (!series) {
-        const message = `Nenhuma série ativa para ${documentType}. Configure as séries de faturação.`;
-        toast({ title: 'Erro ao emitir fatura', description: message, variant: 'destructive' });
-        return { data: null, error: message };
+      const invoice = toInvoice(data.invoice);
+      upsertInvoiceInStore(invoice);
+
+      if (data.existing) {
+        toast({ description: `Factura já emitida para esta venda: ${invoice.series}-${String(invoice.number).padStart(4, '0')}` });
+      } else {
+        toast({ title: 'Factura emitida', description: `${invoice.series}-${String(invoice.number).padStart(4, '0')}` });
+        auditLog('invoice', 'invoices', invoice.id, { documentType, series: invoice.series, number: invoice.number, total: invoice.total });
       }
 
-      const nextNumber = series.currentNumber + 1;
-
-      const items = (sale.items || []).map((item: any) => ({
-        productId: item.productId || item.product_id,
-        productName: item.product?.name || '',
-        quantity: item.quantity || 0,
-        unitPrice: item.product?.price || 0,
-        ivaRate: item.product?.ivaRate ?? 16,
-        ivaAmount: ((item.product?.price || 0) * (item.product?.ivaRate ?? 16) / 100) * (item.quantity || 0),
-        total: item.subtotal || 0,
-      }));
-
-      const subtotal = items.reduce((acc: number, i: any) => acc + i.total, 0);
-      const ivaAmount = items.reduce((acc: number, i: any) => acc + i.ivaAmount, 0);
-      const total = subtotal + ivaAmount;
-
-      const invoiceData = {
-        business_id: currentBusiness.id,
-        sale_id: saleId,
-        document_type: documentType,
-        series: series.prefix,
-        number: nextNumber,
-        client_name: clientInfo?.name || null,
-        client_nuit: clientInfo?.nuit || null,
-        client_address: clientInfo?.address || null,
-        items,
-        subtotal,
-        iva_rate: 16,
-        iva_amount: ivaAmount,
-        withholding_tax: 0,
-        total,
-        status: 'issued',
-        issued_at: new Date().toISOString(),
-      };
-
-      const { data, error: insertError } = await supabase
-        .from('invoices')
-        .insert(invoiceData)
-        .select()
-        .single();
-
-      if (insertError) throw insertError;
-
-      const invoice = toInvoice(data);
-      useStore.getState().addInvoice(invoice);
-
-      toast({ title: 'Factura emitida', description: `${documentType} ${series.prefix}-${nextNumber}` });
-      auditLog('invoice', 'invoices', invoice.id, { documentType, series: series.prefix, number: nextNumber, total });
-
-      return { data: invoice, error: null };
+      return { data: invoice, error: null, existing: Boolean(data.existing) };
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Erro ao emitir factura';
       toast({ title: 'Erro', description: message, variant: 'destructive' });
       return { data: null, error: message };
     }
-  }, [currentBusiness?.id, toast]);
+  }, [currentBusiness?.id, toast, auditLog]);
+
+  const issueCreditNote = useCallback(async (originalInvoiceId: string, reason?: string) => {
+    if (!currentBusiness?.id) return { data: null, error: 'Negócio não encontrado' };
+
+    try {
+      const { data, error } = await supabase.rpc('issue_credit_note', {
+        p_business_id: currentBusiness.id,
+        p_original_invoice_id: originalInvoiceId,
+        p_reason: reason || null,
+      });
+
+      if (error) throw error;
+
+      const invoice = toInvoice(data.invoice);
+      upsertInvoiceInStore(invoice);
+
+      if (data.existing) {
+        toast({ description: `Nota de crédito já emitida: ${invoice.series}-${String(invoice.number).padStart(4, '0')}` });
+      } else {
+        toast({ title: 'Nota de crédito emitida', description: `${invoice.series}-${String(invoice.number).padStart(4, '0')}` });
+        auditLog('credit_note', 'invoices', invoice.id, { originalInvoiceId, series: invoice.series, number: invoice.number, total: invoice.total });
+      }
+
+      return { data: invoice, error: null, existing: Boolean(data.existing) };
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erro ao emitir nota de crédito';
+      toast({ title: 'Erro', description: message, variant: 'destructive' });
+      return { data: null, error: message };
+    }
+  }, [currentBusiness?.id, toast, auditLog]);
 
   const cancelInvoice = useCallback(async (invoiceId: string, reason?: string) => {
     if (!currentBusiness?.id) return { error: 'Negócio não encontrado' };
@@ -225,13 +218,14 @@ export function useInvoices() {
       if (updateError) throw updateError;
 
       useStore.getState().updateInvoice(invoiceId, { printedCount: (data.printed_count || 0) + 1 });
+      auditLog('reprint', 'invoices', invoiceId, { series: data.series, number: data.number });
 
       return { data: toInvoice(data), error: null };
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Erro ao reimprimir';
       return { error: message };
     }
-  }, [currentBusiness?.id]);
+  }, [currentBusiness?.id, auditLog]);
 
   return {
     invoices,
@@ -240,6 +234,7 @@ export function useInvoices() {
     error,
     loadData,
     issueInvoice,
+    issueCreditNote,
     cancelInvoice,
     reprintInvoice,
   };

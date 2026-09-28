@@ -1,26 +1,57 @@
 import { useMemo, useState, type ComponentType } from 'react';
-import { ShoppingCart, AlertTriangle, Banknote, CreditCard, Smartphone, Package, Calendar, Receipt, RefreshCw, Target } from 'lucide-react';
+import {
+  ShoppingCart,
+  Banknote,
+  CreditCard,
+  Smartphone,
+  Package,
+  Receipt,
+  RefreshCw,
+  Target,
+  WifiOff,
+  Wifi,
+  Calendar,
+} from 'lucide-react';
 import { MetricCard } from '@/components/ui/metric-card';
 import { DateFilter, type DateRange } from '@/components/dashboard/DateFilter';
-import { SalesChart } from '@/components/dashboard/SalesChart';
+import { OperationState } from '@/components/dashboard/OperationState';
+import { RequiresAttention } from '@/components/dashboard/RequiresAttention';
+import { SecondaryKpis } from '@/components/dashboard/SecondaryKpis';
+import { SalesPerformanceChart } from '@/components/dashboard/SalesPerformanceChart';
 import { TopProducts } from '@/components/dashboard/TopProducts';
 import { RecentSales } from '@/components/dashboard/RecentSales';
-import { AlertsPanel } from '@/components/dashboard/AlertsPanel';
-import { HealthCheckPanel } from '@/components/dashboard/HealthCheckPanel';
-import { HourlySalesChart } from '@/components/dashboard/HourlySalesChart';
+import { CategoryBreakdown } from '@/components/dashboard/CategoryBreakdown';
+import { BusinessInsights } from '@/components/dashboard/BusinessInsights';
+import { QuickActions } from '@/components/dashboard/QuickActions';
 import { TopTablesCard } from '@/components/dashboard/TopTablesCard';
+import { HealthCheckPanel } from '@/components/dashboard/HealthCheckPanel';
 import { useDatabase } from '@/hooks/useDatabase';
 import { useStore } from '@/store/useStore';
+import { useOpenShift, type OpenShiftState } from '@/hooks/useOpenShift';
 import { formatCurrency } from '@/lib/utils';
-import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/ui/page-header';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
-import { startOfDay, addDays, subDays, differenceInDays, startOfWeek, startOfMonth, endOfWeek, endOfMonth } from 'date-fns';
+import { SectionHeader } from '@/components/ui/section-header';
+import { Skeleton } from '@/components/ui/skeleton';
+import { ErrorState } from '@/components/ui/error-state';
+import {
+  startOfDay,
+  addDays,
+  subDays,
+  differenceInDays,
+  startOfWeek,
+  startOfMonth,
+  endOfWeek,
+  endOfMonth,
+} from 'date-fns';
 import { useBusinessGoals } from '@/hooks/useBusinessGoals';
+import { useOfflineSync } from '@/hooks/useOfflineSync';
 import { useI18n } from '@/contexts/I18nContext';
+import { usePermissions } from '@/hooks/usePermissions';
+import { useNavigate } from 'react-router-dom';
+import { Crown } from 'lucide-react';
 
 interface PaymentMethodCardProps {
   label: string;
@@ -78,22 +109,25 @@ const initialRange: DateRange = {
 };
 
 export default function Dashboard() {
-  const { loading, loadAllSales } = useDatabase();
-  const { orders, products, sales, ingredients } = useStore();
+  const navigate = useNavigate();
+  const { loading, error, sales, loadAllSales, profitByProduct } = useDatabase();
+  const products = useStore(s => s.products);
+  const ingredients = useStore(s => s.ingredients);
+  const credits = useStore(s => s.credits);
+  const tables = useStore(s => s.tables);
   const { goals } = useBusinessGoals();
+  const { online, pendingCount, syncPending } = useOfflineSync();
+  const openShiftState = useOpenShift();
   const [range, setRange] = useState<DateRange>(initialRange);
   const [refreshing, setRefreshing] = useState(false);
   const { t } = useI18n();
+  const { isSuperAdmin } = usePermissions();
 
   const now = new Date();
   const weekStart = startOfWeek(now, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
   const monthStart = startOfMonth(now);
   const monthEnd = endOfMonth(now);
-
-  const todaySales = sales
-    .filter(s => new Date(s.createdAt).toDateString() === now.toDateString())
-    .reduce((acc, s) => acc + s.total, 0);
 
   const weekSales = sales
     .filter(s => {
@@ -109,11 +143,6 @@ export default function Dashboard() {
     })
     .reduce((acc, s) => acc + s.total, 0);
 
-  const criticalStockProducts = products.filter(p => p.stock <= 5);
-  const criticalIngredients = ingredients.filter(i => i.stock <= i.minStock);
-  const activeOrders = orders.filter(o => o.status !== 'paid');
-
-  // Vendas do período selecionado + período anterior equivalente
   const filteredSales = useMemo(() => {
     const from = startOfDay(range.from);
     const toEnd = addDays(startOfDay(range.to), 1);
@@ -136,16 +165,60 @@ export default function Dashboard() {
   const metrics = useMemo(() => {
     const revenue = filteredSales.reduce((acc, s) => acc + s.total, 0);
     const count = filteredSales.length;
-    const productsSold = filteredSales.reduce((acc, s) => acc + s.items.reduce((a, i) => a + i.quantity, 0), 0);
+    const productsSold = filteredSales.reduce(
+      (acc, s) => acc + s.items.reduce((a, i) => a + i.quantity, 0),
+      0,
+    );
     const avgTicket = count > 0 ? revenue / count : 0;
 
     const prevRevenue = previousSales.reduce((acc, s) => acc + s.total, 0);
     const prevCount = previousSales.length;
-    const prevProductsSold = previousSales.reduce((acc, s) => acc + s.items.reduce((a, i) => a + i.quantity, 0), 0);
+    const prevProductsSold = previousSales.reduce(
+      (acc, s) => acc + s.items.reduce((a, i) => a + i.quantity, 0),
+      0,
+    );
     const prevAvgTicket = prevCount > 0 ? prevRevenue / prevCount : 0;
 
-    return { revenue, count, productsSold, avgTicket, prevRevenue, prevCount, prevProductsSold, prevAvgTicket };
+    return {
+      revenue,
+      count,
+      productsSold,
+      avgTicket,
+      prevRevenue,
+      prevCount,
+      prevProductsSold,
+      prevAvgTicket,
+    };
   }, [filteredSales, previousSales]);
+
+  const periodProfit = useMemo(() => {
+    const estimate = (salesList: typeof filteredSales) => {
+      let costAvailable = true;
+      let grossProfit = 0;
+      let revenue = 0;
+      salesList.forEach(s =>
+        s.items.forEach(item => {
+          const p = profitByProduct[item.productId];
+          if (!p || p.realUnitCost <= 0) {
+            costAvailable = false;
+            return;
+          }
+          grossProfit += item.subtotal - item.quantity * p.realUnitCost;
+          revenue += item.subtotal;
+        }),
+      );
+      return { costAvailable, grossProfit, revenue };
+    };
+
+    const current = estimate(filteredSales);
+    const previous = estimate(previousSales);
+    return {
+      available: current.costAvailable && current.revenue > 0,
+      grossProfit: current.grossProfit,
+      grossMargin: current.revenue > 0 ? (current.grossProfit / current.revenue) * 100 : 0,
+      prevGrossProfit: previous.costAvailable && previous.revenue > 0 ? previous.grossProfit : undefined,
+    };
+  }, [filteredSales, previousSales, profitByProduct]);
 
   const periodPayments = useMemo(() => {
     return filteredSales.reduce<{ cash: number; mpesa: number; emola: number; card: number }>(
@@ -160,19 +233,28 @@ export default function Dashboard() {
     );
   }, [filteredSales]);
 
-  const paymentChartData = [
-    { name: 'Dinheiro', value: periodPayments.cash, color: '#10b981' },
-    { name: 'M-Pesa', value: periodPayments.mpesa, color: '#3b82f6' },
-    { name: 'E-Mola', value: periodPayments.emola, color: '#8b5cf6' },
-    { name: 'Cartão', value: periodPayments.card, color: '#f59e0b' },
-  ].filter(m => m.value > 0);
+  const criticalStockCount =
+    products.filter(p => p.stock <= 5).length +
+    ingredients.filter(i => i.stock <= i.minStock).length;
+
+  const pendingCredits = credits.reduce((acc, c) => acc + (c.remainingBalance || 0), 0);
+  const tablesOccupied = tables.filter(t => t.status !== 'free').length;
+
+  const revenuePct =
+    metrics.prevRevenue > 0
+      ? ((metrics.revenue - metrics.prevRevenue) / metrics.prevRevenue) * 100
+      : metrics.revenue > 0
+        ? undefined
+        : 0;
+
+  const countPct = getTrend(metrics.count, metrics.prevCount)?.value;
 
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
       await loadAllSales();
-    } catch (error) {
-      console.error(error);
+    } catch (err) {
+      console.error(err);
     } finally {
       setRefreshing(false);
     }
@@ -180,79 +262,200 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <LoadingSpinner size="lg" text="Carregando dashboard..." />
+      <div className="space-y-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-64" />
+            <Skeleton className="h-4 w-72" />
+          </div>
+          <Skeleton className="h-9 w-52" />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i}>
+              <CardContent className="p-4">
+                <Skeleton className="h-4 w-24 mb-3" />
+                <Skeleton className="h-8 w-32" />
+                <Skeleton className="h-3 w-28 mt-3" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <Skeleton className="h-4 w-40" />
+            <Skeleton className="h-40 w-full" />
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
+  if (error && sales.length === 0) {
+    return (
+      <ErrorState
+        title="Não foi possível carregar o centro de comando"
+        message="Ocorreu um erro ao carregar os dados. Tente novamente."
+        onRetry={() => window.location.reload()}
+      />
+    );
+  }
+
+  const profitTrend =
+    periodProfit.prevGrossProfit !== undefined
+      ? getTrend(periodProfit.grossProfit, periodProfit.prevGrossProfit)
+      : undefined;
+
+  const showProfit = periodProfit.available;
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="space-y-5">
+      {/* Identidade + Período + Actualizar */}
       <PageHeader
         title={t('nav.dashboard')}
-        description="Visão geral do seu estabelecimento"
+        description="Visão geral da operação e desempenho do negócio."
       >
-        <Badge variant="outline" className="text-xs">
+        <HealthCheckPanel showDetails={false} />
+        <Badge variant="outline" className="text-xs" aria-label={`Período: ${range.label}`}>
           {range.label}
         </Badge>
         <DateFilter value={range} onChange={setRange} />
         <Button
           variant="outline"
-          size="icon"
+          size="sm"
           onClick={handleRefresh}
           disabled={refreshing}
-          title="Carregar histórico completo"
+          title="Actualizar dados"
         >
-          <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+          {refreshing ? 'A actualizar...' : 'Actualizar'}
         </Button>
       </PageHeader>
 
-      {/* Alertas e Health Check */}
-      <AlertsPanel />
-      <HealthCheckPanel showDetails={true} />
+      {/* Estado offline / sincronização */}
+      {!online && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm">
+          <span className="flex items-center gap-2 text-destructive">
+            <WifiOff className="h-4 w-4 shrink-0" />
+            Offline — alguns dados podem estar desactualizados.
+          </span>
+          {pendingCount > 0 && (
+            <span className="text-xs text-muted-foreground">
+              {pendingCount} venda{pendingCount === 1 ? '' : 's'} aguarda{pendingCount === 1 ? '' : 'm'} sincronização
+            </span>
+          )}
+        </div>
+      )}
+      {online && pendingCount > 0 && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
+          <span className="flex items-center gap-2 text-warning">
+            <Wifi className="h-4 w-4 shrink-0" />
+            {pendingCount} venda{pendingCount === 1 ? '' : 's'} aguarda{pendingCount === 1 ? '' : 'm'} sincronização.
+          </span>
+          <Button variant="outline" size="sm" onClick={() => syncPending()}>
+            Sincronizar
+          </Button>
+        </div>
+      )}
 
-      {/* Métricas do período */}
+      {/* Estado operacional */}
+      <OperationState />
+
+      {/* Super Admin — visão global multi-tenant */}
+      {isSuperAdmin && (
+        <button
+          onClick={() => navigate('/administracao')}
+          className="w-full flex items-center justify-between gap-3 rounded-lg border border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-left hover:bg-yellow-500/15 transition-colors"
+        >
+          <span className="flex items-center gap-2 text-yellow-700">
+            <Crown className="h-4 w-4 shrink-0" />
+            Visão global multi-estabelecimento disponível — Gerir todos os bares e utilizadores.
+          </span>
+          <span className="text-xs font-medium text-yellow-700 underline underline-offset-2">Abrir Administração Central</span>
+        </button>
+      )}
+
+      {/* KPIs principais */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <MetricCard
-          title="Receita do Período"
+          title="Receita"
           value={formatCurrency(metrics.revenue)}
           icon={Banknote}
           trend={getTrend(metrics.revenue, metrics.prevRevenue)}
+          onClick={() => navigate('/sales/history')}
+          className="cursor-pointer"
         />
         <MetricCard
-          title="Vendas no Período"
-          value={metrics.count}
+          title="Vendas"
+          value={metrics.count.toLocaleString('pt-MZ')}
           icon={Receipt}
           trend={getTrend(metrics.count, metrics.prevCount)}
+          onClick={() => navigate('/sales')}
+          className="cursor-pointer"
         />
         <MetricCard
-          title="Ticket Médio"
+          title="Ticket médio"
           value={formatCurrency(metrics.avgTicket)}
           icon={ShoppingCart}
           trend={getTrend(metrics.avgTicket, metrics.prevAvgTicket)}
         />
-        <MetricCard
-          title="Produtos Vendidos"
-          value={metrics.productsSold}
-          icon={Package}
-          trend={getTrend(metrics.productsSold, metrics.prevProductsSold)}
-        />
+        {showProfit ? (
+          <MetricCard
+            title="Lucro estimado"
+            value={formatCurrency(periodProfit.grossProfit)}
+            subtitle={`${periodProfit.grossMargin.toFixed(1)}% de margem`}
+            icon={Package}
+            trend={profitTrend}
+            className={periodProfit.grossProfit < 0 ? 'border-destructive/40' : ''}
+          />
+        ) : (
+          <MetricCard
+            title="Produtos vendidos"
+            value={metrics.productsSold.toLocaleString('pt-MZ')}
+            icon={Package}
+            trend={getTrend(metrics.productsSold, metrics.prevProductsSold)}
+          />
+        )}
       </div>
 
-      {/* Payment Methods Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <PaymentMethodCard label="Dinheiro" value={periodPayments.cash} icon={Banknote} tint="green" />
-        <PaymentMethodCard label="M-Pesa" value={periodPayments.mpesa} icon={Smartphone} tint="blue" />
-        <PaymentMethodCard label="E-Mola" value={periodPayments.emola} icon={Smartphone} tint="purple" />
-        <PaymentMethodCard label="Cartão" value={periodPayments.card} icon={CreditCard} tint="orange" />
+      {/* KPIs secundários */}
+      <SecondaryKpis shift={openShiftState} />
+
+      {/* Requer atenção */}
+      <RequiresAttention />
+
+      {/* Formas de pagamento */}
+      <div>
+        <SectionHeader title="Formas de pagamento" description={`Período: ${range.label}`} />
+        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <PaymentMethodCard label="Dinheiro" value={periodPayments.cash} icon={Banknote} tint="green" />
+          <PaymentMethodCard label="M-Pesa" value={periodPayments.mpesa} icon={Smartphone} tint="blue" />
+          <PaymentMethodCard label="E-Mola" value={periodPayments.emola} icon={Smartphone} tint="purple" />
+          <PaymentMethodCard label="Cartão" value={periodPayments.card} icon={CreditCard} tint="orange" />
+        </div>
       </div>
 
-      {/* Sales Summary */}
+      {/* Desempenho de vendas */}
+      <SalesPerformanceChart
+        sales={filteredSales}
+        range={range}
+        revenue={metrics.revenue}
+        prevRevenue={metrics.prevRevenue}
+        count={metrics.count}
+        prevCount={metrics.prevCount}
+      />
+
+      {/* Produtos mais vendidos + categorias */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <TopProducts />
+        <CategoryBreakdown sales={filteredSales} />
+      </div>
+
+      {/* Resumo de vendas (hoje/semana/mês) */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Calendar className="h-4 w-4" />
             Resumo de Vendas
           </CardTitle>
         </CardHeader>
@@ -277,111 +480,29 @@ export default function Dashboard() {
         </CardContent>
       </Card>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <SalesChart />
-        <HourlySalesChart />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <TopProducts />
-        <TopTablesCard />
+      {/* Vendas recentes + mesas */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <RecentSales />
+        <TopTablesCard />
       </div>
 
-      {/* Payment Methods Chart */}
-      {paymentChartData.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Métodos de Pagamento ({range.label})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={paymentChartData}
-                    innerRadius={70}
-                    outerRadius={110}
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
-                    {paymentChartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={(value: number) => formatCurrency(value)}
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--popover))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px',
-                      color: 'hsl(var(--popover-foreground))',
-                    }}
-                  />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Insights do negócio */}
+      <div className="space-y-3">
+        <SectionHeader
+          title="Insights do negócio"
+          description="Leituras automáticas dos dados actuais"
+        />
+        <BusinessInsights
+          revenuePct={revenuePct}
+          countPct={countPct}
+          criticalStockCount={criticalStockCount}
+          pendingCredits={pendingCredits}
+          openShift={openShiftState.open}
+          tablesOccupied={tablesOccupied}
+        />
+      </div>
 
-      {/* Stock Alerts */}
-      {(criticalIngredients.length > 0 || criticalStockProducts.length > 0) && (
-        <Card className="border-warning/40">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-warning">
-              <AlertTriangle className="h-5 w-5" />
-              Alertas de Stock Baixo
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {criticalIngredients.length > 0 && (
-              <div>
-                <h4 className="font-semibold mb-3 flex items-center gap-2">
-                  <Package className="h-4 w-4" />
-                  Ingredientes ({criticalIngredients.length})
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                  {criticalIngredients.map((ingredient) => (
-                    <div key={ingredient.id} className="bg-warning/10 rounded-lg p-3 border border-warning/20">
-                      <p className="text-sm font-medium">{ingredient.name}</p>
-                      <p className="text-xs text-warning font-semibold">
-                        {ingredient.stock} {ingredient.unit}
-                      </p>
-                      <p className="text-xs text-muted-foreground">Mínimo: {ingredient.minStock} {ingredient.unit}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {criticalStockProducts.length > 0 && (
-              <div>
-                <h4 className="font-semibold mb-3 flex items-center gap-2">
-                  <ShoppingCart className="h-4 w-4" />
-                  Produtos ({criticalStockProducts.length})
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                  {criticalStockProducts.map((product) => (
-                    <div key={product.id} className="bg-destructive/10 rounded-lg p-3 border border-destructive/20 flex items-center gap-3">
-                      {product.image && (
-                        <img src={product.image} alt={product.name} className="h-10 w-10 rounded-lg object-cover" />
-                      )}
-                      <div>
-                        <p className="text-sm font-medium">{product.name}</p>
-                        <p className="text-xs text-destructive font-semibold">{product.stock} em stock</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
+      {/* Metas */}
       {goals.length > 0 && (
         <Card>
           <CardHeader>
@@ -395,18 +516,30 @@ export default function Dashboard() {
               {goals.slice(0, 6).map(goal => (
                 <div key={goal.id} className="space-y-1">
                   <div className="flex justify-between text-sm">
-                    <span className="font-medium">{goal.category === 'revenue' ? 'Receita' : goal.category === 'sales_count' ? 'Vendas' : 'Ticket Médio'}</span>
+                    <span className="font-medium">
+                      {goal.category === 'revenue'
+                        ? 'Receita'
+                        : goal.category === 'sales_count'
+                          ? 'Vendas'
+                          : 'Ticket Médio'}
+                    </span>
                     <span className="text-muted-foreground">{goal.progress.toFixed(0)}%</span>
                   </div>
                   <div className="h-2 bg-muted rounded-full overflow-hidden">
                     <div
-                      className={`h-full rounded-full transition-all ${goal.status === 'achieved' || goal.status === 'overachieved' ? 'bg-green-500' : 'bg-primary'}`}
+                      className={`h-full rounded-full transition-all ${
+                        goal.status === 'achieved' || goal.status === 'overachieved'
+                          ? 'bg-green-500'
+                          : 'bg-primary'
+                      }`}
                       style={{ width: `${Math.min(goal.progress, 100)}%` }}
                     />
                   </div>
                   <div className="flex justify-between text-xs text-muted-foreground">
                     <span>{goal.current.toLocaleString('pt-MZ', { minimumFractionDigits: 0 })}</span>
-                    <span>Meta: {goal.target.toLocaleString('pt-MZ', { minimumFractionDigits: 0 })}</span>
+                    <span>
+                      Meta: {goal.target.toLocaleString('pt-MZ', { minimumFractionDigits: 0 })}
+                    </span>
                   </div>
                 </div>
               ))}
@@ -415,15 +548,8 @@ export default function Dashboard() {
         </Card>
       )}
 
-      <div className="flex items-center justify-between text-xs text-muted-foreground pt-2">
-        <span className="flex items-center gap-1">
-          <Receipt className="h-3 w-3" />
-          {metrics.count} venda(s) no período selecionado
-        </span>
-        <span>
-          Período anterior: {formatCurrency(metrics.prevRevenue)}
-        </span>
-      </div>
+      {/* Acções rápidas */}
+      <QuickActions />
     </div>
   );
 }

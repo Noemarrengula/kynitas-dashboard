@@ -1,11 +1,24 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useBusiness } from '@/contexts/BusinessContext';
-import { Supplier, PurchaseOrder } from '@/types';
-import { sanitizeText, sanitizeObject } from '@/lib/sanitize';
+import { useStore } from '@/store/useStore';
+import {
+  Supplier,
+  PurchaseOrder,
+  PurchaseReceipt,
+  Loss,
+  LossInput,
+  ReceivePurchaseResult,
+} from '@/types';
+import { sanitizeObject } from '@/lib/sanitize';
 
 interface HookResult<T> {
   data: T | null;
+  error: Error | null;
+}
+
+interface ReceiveResult {
+  data: ReceivePurchaseResult | null;
   error: Error | null;
 }
 
@@ -13,6 +26,8 @@ export function useSuppliers() {
   const { currentBusiness } = useBusiness();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
+  const [purchaseReceipts, setPurchaseReceipts] = useState<PurchaseReceipt[]>([]);
+  const [losses, setLosses] = useState<Loss[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchSuppliers = useCallback(async () => {
@@ -51,11 +66,52 @@ export function useSuppliers() {
     }
   }, [currentBusiness?.id]);
 
+  const fetchPurchaseReceipts = useCallback(async () => {
+    if (!currentBusiness?.id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('purchase_receipts')
+        .select('*')
+        .eq('business_id', currentBusiness.id)
+        .order('receipt_date', { ascending: false });
+
+      if (!error && data) {
+        setPurchaseReceipts(data);
+      }
+    } catch (err) {
+      console.error('Erro ao buscar receções:', err);
+    }
+  }, [currentBusiness?.id]);
+
+  const fetchLosses = useCallback(async () => {
+    if (!currentBusiness?.id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('losses')
+        .select('*')
+        .eq('business_id', currentBusiness.id)
+        .order('loss_date', { ascending: false });
+
+      if (!error && data) {
+        setLosses(data);
+      }
+    } catch (err) {
+      console.error('Erro ao buscar perdas:', err);
+    }
+  }, [currentBusiness?.id]);
+
   const loadAll = useCallback(async () => {
     setLoading(true);
-    await Promise.all([fetchSuppliers(), fetchPurchaseOrders()]);
+    await Promise.all([
+      fetchSuppliers(),
+      fetchPurchaseOrders(),
+      fetchPurchaseReceipts(),
+      fetchLosses(),
+    ]);
     setLoading(false);
-  }, [fetchSuppliers, fetchPurchaseOrders]);
+  }, [fetchSuppliers, fetchPurchaseOrders, fetchPurchaseReceipts, fetchLosses]);
 
   useEffect(() => {
     if (currentBusiness?.id) {
@@ -84,7 +140,7 @@ export function useSuppliers() {
       return { data: null, error: null };
     } catch (err: unknown) {
       console.error('Erro ao adicionar fornecedor:', err);
-      return { data: null, error: err };
+      return { data: null, error: err as Error };
     }
   }, [currentBusiness?.id, suppliers]);
 
@@ -106,7 +162,7 @@ export function useSuppliers() {
       return { data: null, error: null };
     } catch (err: unknown) {
       console.error('Erro ao atualizar fornecedor:', err);
-      return { data: null, error: err };
+      return { data: null, error: err as Error };
     }
   }, [currentBusiness?.id, suppliers]);
 
@@ -126,7 +182,7 @@ export function useSuppliers() {
       return { data: null, error: null };
     } catch (err: unknown) {
       console.error('Erro ao remover fornecedor:', err);
-      return { data: null, error: err };
+      return { data: null, error: err as Error };
     }
   }, [currentBusiness?.id, suppliers]);
 
@@ -148,7 +204,7 @@ export function useSuppliers() {
         .insert([{
           ...sanitized,
           business_id: currentBusiness.id,
-          order_number: poNumber
+          order_number: poNumber,
         }])
         .select()
         .single();
@@ -162,7 +218,7 @@ export function useSuppliers() {
       return { data: null, error: null };
     } catch (err: unknown) {
       console.error('Erro ao criar ordem de compra:', err);
-      return { data: null, error: err };
+      return { data: null, error: err as Error };
     }
   }, [currentBusiness?.id, purchaseOrders]);
 
@@ -182,86 +238,194 @@ export function useSuppliers() {
       return { data: null, error: null };
     } catch (err: unknown) {
       console.error('Erro ao atualizar ordem de compra:', err);
-      return { data: null, error: err };
+      return { data: null, error: err as Error };
     }
   }, [currentBusiness?.id, purchaseOrders]);
 
-  const receivePurchaseOrder = useCallback(async (poId: string, items: any[], invoiceNumber?: string) => {
+  const cancelPurchaseOrder = useCallback(async (id: string): Promise<HookResult<null>> => {
+    return updatePurchaseOrder(id, { status: 'cancelled' });
+  }, [updatePurchaseOrder]);
+
+  const receivePurchaseOrder = useCallback(async (poId: string, items: Array<Record<string, any>>, invoiceNumber?: string): Promise<ReceiveResult> => {
     try {
-      if (!currentBusiness?.id) throw new Error('Negócio não encontrado');
+      if (!currentBusiness?.id) return { data: null, error: new Error('Negócio não encontrado') };
 
       const { data, error } = await supabase.rpc('receive_purchase_order', {
         po_id: poId,
         received_items: items,
-        invoice_num: invoiceNumber
+        invoice_num: invoiceNumber,
       });
 
       if (error) throw error;
 
-      if (data) {
-        const productIds = items.filter(i => i.product_id).map(i => i.product_id);
-        const ingredientIds = items.filter(i => i.ingredient_id).map(i => i.ingredient_id);
+      const result = (data ?? null) as ReceivePurchaseResult | null;
 
-        if (productIds.length > 0) {
-          const { data: products } = await supabase
-            .from('products')
-            .select('id, stock')
-            .in('id', productIds);
+      if (result) {
+        // Sincroniza a store local com o que o RPC executou (sem double-writes)
+        const store = useStore.getState();
+        const prodQty: Record<string, number> = {};
+        const ingQty: Record<string, number> = {};
 
-          if (products) {
-            const updates = products.map(p => {
-              const item = items.find(i => i.product_id === p.id);
-              return {
-                id: p.id,
-                stock: (p.stock || 0) + (item?.quantity || 0)
-              };
+        (result.movements || []).forEach((m) => {
+          const qty = Number(m.quantity) || 0;
+          if (m.product_id) {
+            store.addStockMovement({
+              id: m.id,
+              productId: m.product_id,
+              ingredientId: undefined,
+              type: (m.type as 'entry' | 'exit' | 'sale') || 'entry',
+              quantity: Math.abs(qty),
+              reason: m.reason || '',
+              createdAt: m.created_at ? new Date(m.created_at) : new Date(),
             });
-            for (const u of updates) {
-              await supabase.from('products').update({ stock: u.stock }).eq('id', u.id);
-            }
+            prodQty[m.product_id] = (prodQty[m.product_id] || 0) + Math.abs(qty);
           }
-        }
-
-        if (ingredientIds.length > 0) {
-          const { data: ingredients } = await supabase
-            .from('ingredients')
-            .select('id, stock')
-            .in('id', ingredientIds);
-
-          if (ingredients) {
-            const updates = ingredients.map(ing => {
-              const item = items.find(i => i.ingredient_id === ing.id);
-              return {
-                id: ing.id,
-                stock: (ing.stock || 0) + (item?.quantity || 0)
-              };
+          if (m.ingredient_id) {
+            store.addStockMovement({
+              id: m.id,
+              productId: undefined,
+              ingredientId: m.ingredient_id,
+              type: (m.type as 'entry' | 'exit' | 'sale') || 'entry',
+              quantity: Math.abs(qty),
+              reason: m.reason || '',
+              createdAt: m.created_at ? new Date(m.created_at) : new Date(),
             });
-            for (const u of updates) {
-              await supabase.from('ingredients').update({ stock: u.stock }).eq('id', u.id);
-            }
+            ingQty[m.ingredient_id] = (ingQty[m.ingredient_id] || 0) + Math.abs(qty);
           }
+        });
+
+        Object.entries(prodQty).forEach(([pid, qty]) => {
+          const current = store.products.find(p => p.id === pid)?.stock ?? 0;
+          store.updateProduct(pid, { stock: Number((Number(current) + qty).toFixed(2)) });
+        });
+        Object.entries(ingQty).forEach(([iid, qty]) => {
+          const current = store.ingredients.find(i => i.id === iid)?.stock ?? 0;
+          store.updateIngredient(iid, { stock: Number((Number(current) + qty).toFixed(2)) });
+        });
+
+        // Adiciona a receção localmente
+        const newReceipt: PurchaseReceipt = {
+          id: result.receipt_id || `rec-${Date.now()}`,
+          business_id: currentBusiness.id,
+          purchase_order_id: poId,
+          receipt_date: new Date().toISOString().slice(0, 10),
+          receipt_number: result.receipt_number,
+          items: items.map((it) => ({
+            product_id: it.product_id,
+            product_name: it.product_name,
+            ingredient_id: it.ingredient_id,
+            ingredient_name: it.ingredient_name,
+            ordered_quantity: Number(it.ordered_quantity) || 0,
+            received_quantity: Number(it.received_quantity) || Number(it.quantity) || 0,
+            quantity: Number(it.quantity) || 0,
+            damaged_quantity: Number(it.damaged_quantity) || 0,
+            unit_price: Number(it.unit_price) || 0,
+          })),
+          total: items.reduce((acc, it) => acc + (Number(it.quantity) || 0) * (Number(it.unit_price) || 0), 0),
+          invoice_number: invoiceNumber,
+          created_at: new Date().toISOString(),
+        };
+        setPurchaseReceipts([newReceipt, ...purchaseReceipts]);
+
+        // Actualiza o estado da ordem em cache
+        if (result.status) {
+          setPurchaseOrders(purchaseOrders.map(po => po.id === poId ? { ...po, status: result.status as PurchaseOrder['status'] } : po));
         }
       }
 
       await fetchPurchaseOrders();
-      return data;
+      await fetchPurchaseReceipts();
+      return { data: result, error: null };
     } catch (err: unknown) {
       console.error('Erro ao receber ordem de compra:', err);
-      return null;
+      return { data: null, error: err as Error };
     }
-  }, [currentBusiness?.id, fetchPurchaseOrders]);
+  }, [currentBusiness?.id, fetchPurchaseOrders, fetchPurchaseReceipts, purchaseOrders, purchaseReceipts]);
+
+  const addLoss = useCallback(async (input: LossInput): Promise<HookResult<Loss>> => {
+    try {
+      if (!currentBusiness?.id) return { data: null, error: new Error('Negócio não encontrado') };
+      if ((!input.product_id && !input.ingredient_id) || input.quantity <= 0) {
+        return { data: null, error: new Error('Indique um item e uma quantidade válida') };
+      }
+
+      const { data, error } = await supabase
+        .from('losses')
+        .insert([{
+          business_id: currentBusiness.id,
+          product_id: input.product_id || null,
+          ingredient_id: input.ingredient_id || null,
+          quantity: input.quantity,
+          unit: input.unit || null,
+          reason: input.reason,
+          loss_date: input.loss_date || new Date().toISOString().slice(0, 10),
+          notes: input.notes || null,
+          status: 'pending',
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        setLosses([data, ...losses]);
+        return { data, error: null };
+      }
+      return { data: null, error: null };
+    } catch (err: unknown) {
+      console.error('Erro ao registar perda:', err);
+      return { data: null, error: err as Error };
+    }
+  }, [currentBusiness?.id, losses]);
+
+  const updateLossStatus = useCallback(async (id: string, status: Loss['status']): Promise<HookResult<null>> => {
+    try {
+      if (!currentBusiness?.id) return { data: null, error: new Error('Negócio não encontrado') };
+
+      const { error } = await supabase
+        .from('losses')
+        .update({ status })
+        .eq('id', id)
+        .eq('business_id', currentBusiness.id);
+
+      if (error) throw error;
+
+      setLosses(losses.map(l => l.id === id ? { ...l, status } : l));
+      return { data: null, error: null };
+    } catch (err: unknown) {
+      console.error('Erro ao atualizar perda:', err);
+      return { data: null, error: err as Error };
+    }
+  }, [currentBusiness?.id, losses]);
+
+  const confirmLoss = useCallback(async (id: string): Promise<HookResult<null>> => {
+    return updateLossStatus(id, 'confirmed');
+  }, [updateLossStatus]);
+
+  const cancelLoss = useCallback(async (id: string): Promise<HookResult<null>> => {
+    return updateLossStatus(id, 'cancelled');
+  }, [updateLossStatus]);
 
   return {
     suppliers,
     purchaseOrders,
+    purchaseReceipts,
+    losses,
     loading,
     addSupplier,
     updateSupplier,
     deleteSupplier,
     createPurchaseOrder,
     updatePurchaseOrder,
+    cancelPurchaseOrder,
     receivePurchaseOrder,
+    addLoss,
+    confirmLoss,
+    cancelLoss,
     refreshSuppliers: fetchSuppliers,
     refreshPurchaseOrders: fetchPurchaseOrders,
+    refreshPurchaseReceipts: fetchPurchaseReceipts,
+    refreshLosses: fetchLosses,
+    refreshAll: loadAll,
   };
 }

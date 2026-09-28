@@ -5,7 +5,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuditLog } from './useAuditLog';
 import { useStore } from '@/store/useStore';
 import { getOnline, enqueuePendingSale, writeCache, readCache } from '@/lib/offline';
-import { Product, Ingredient, Sale, Credit } from '@/types';
+import { Product, Ingredient, Sale, Credit, StockMovement } from '@/types';
+import { generateUUID } from '@/lib/uuid';
 
 interface DatabaseError {
   message: string;
@@ -21,6 +22,10 @@ function isNetworkError(msg?: string): boolean {
 const DB_FIELD_MAP: Record<string, string> = {
   cost_price: 'costPrice',
   costPrice: 'cost_price',
+  cost_per_unit: 'costPerUnit',
+  costPerUnit: 'cost_per_unit',
+  min_stock: 'minStock',
+  minStock: 'min_stock',
   preco_dose: 'precoDose',
   precoDose: 'preco_dose',
   doses_por_garrafa: 'dosesPorGarrafa',
@@ -80,6 +85,22 @@ function toCamelCase(obj: Record<string, any>): Record<string, any> {
   return result;
 }
 
+// Mapeia uma linha de stock_movements (DB) para o tipo front-end.
+// Na DB as saídas são gravadas com quantidade negativa; aqui normaliza-se a
+// magnitude e mantém-se o tipo original ('entry' | 'exit' | 'sale').
+function mapStockMovementRow(row: Record<string, any>): StockMovement {
+  const type = row.type === 'entry' ? 'entry' : row.type === 'sale' ? 'sale' : 'exit';
+  return {
+    id: row.id,
+    productId: row.product_id || undefined,
+    ingredientId: row.ingredient_id || undefined,
+    type,
+    quantity: Math.abs(Number(row.quantity) || 0),
+    reason: row.reason || '',
+    createdAt: new Date(row.created_at),
+  };
+}
+
 export function useDatabase() {
   const { currentBusiness } = useBusiness();
   const { toast } = useToast();
@@ -88,6 +109,7 @@ export function useDatabase() {
   const ingredients = useStore(s => s.ingredients);
   const sales = useStore(s => s.sales);
   const credits = useStore(s => s.credits);
+  const stockMovements = useStore(s => s.stockMovements);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<DatabaseError | null>(null);
   const [retryCount, setRetryCount] = useState(0);
@@ -123,12 +145,14 @@ export function useDatabase() {
     const ingredientsCache = readCache<Record<string, any>[]>(businessId, 'ingredients');
     const salesCache = readCache<Record<string, any>[]>(businessId, 'sales');
     const creditsCache = readCache<Record<string, any>[]>(businessId, 'credits');
+    const stockMovementsCache = readCache<Record<string, any>[]>(businessId, 'stock_movements');
 
     if (
       (productsCache?.rows.length || 0) +
       (ingredientsCache?.rows.length || 0) +
       (salesCache?.rows.length || 0) +
-      (creditsCache?.rows.length || 0) === 0
+      (creditsCache?.rows.length || 0) +
+      (stockMovementsCache?.rows.length || 0) === 0
     ) {
       return false;
     }
@@ -138,6 +162,9 @@ export function useDatabase() {
     }
     if (ingredientsCache?.rows) {
       useStore.getState().setIngredients(ingredientsCache.rows.map(i => toCamelCase(i) as Ingredient));
+    }
+    if (stockMovementsCache?.rows) {
+      useStore.getState().setStockMovements(stockMovementsCache.rows.map(mapStockMovementRow));
     }
     if (salesCache?.rows) {
       const transformedSales = salesCache.rows.map(sale => ({
@@ -259,17 +286,19 @@ export function useDatabase() {
           if (seeded) return;
         }
 
-        const [productsRes, ingredientsRes, salesRes, creditsRes] = await Promise.all([
+        const [productsRes, ingredientsRes, salesRes, creditsRes, stockMovementsRes] = await Promise.all([
             supabase.from('products').select('*').eq('business_id', currentBusiness.id),
             supabase.from('ingredients').select('*').eq('business_id', currentBusiness.id),
             supabase.from('sales').select('*').eq('business_id', currentBusiness.id).order('created_at', { ascending: false }).limit(2000),
             supabase.from('credits').select('*').eq('business_id', currentBusiness.id).order('created_at', { ascending: false }),
+            supabase.from('stock_movements').select('*').eq('business_id', currentBusiness.id).order('created_at', { ascending: false }).limit(500),
           ]);
 
           const productsData = productsRes.data;
           const ingredientsData = ingredientsRes.data;
           const salesData = salesRes.data;
           const creditsData = creditsRes.data;
+          const stockMovementsData = stockMovementsRes.data;
 
         // Atualizar estado com dados carregados
         if (productsData) {
@@ -312,11 +341,17 @@ export function useDatabase() {
           useStore.getState().setCredits(transformedCredits);
         }
 
+        // Movimentações de stock (histórico persistido na DB)
+        if (stockMovementsData) {
+          useStore.getState().setStockMovements(stockMovementsData.map(mapStockMovementRow));
+        }
+
         // Guardar snapshot local (oferece dados quando offline)
         writeCache(currentBusiness.id, 'products', productsRes.data || []);
         writeCache(currentBusiness.id, 'ingredients', ingredientsRes.data || []);
         writeCache(currentBusiness.id, 'sales', salesRes.data || []);
         writeCache(currentBusiness.id, 'credits', creditsRes.data || []);
+        writeCache(currentBusiness.id, 'stock_movements', stockMovementsRes.data || []);
 
         // Se chegou aqui, funcionou
         setLoading(false);
@@ -513,6 +548,65 @@ export function useDatabase() {
       return { error: null };
     } catch (err: unknown) {
       return handleError(err, 'DELETE_INGREDIENT');
+    }
+  };
+
+  // MOVIMENTAÇÕES DE STOCK
+  // Persiste um movimento em stock_movements (quantidade com sinal: entrada
+  // positiva, saída/venda negativa) e actualiza também o estado local para a
+  // lista aparecer imediatamente mesmo offline.
+  const recordStockMovement = async (movement: {
+    productId?: string;
+    ingredientId?: string;
+    type: 'entry' | 'exit' | 'sale';
+    quantity: number;
+    reason?: string;
+  }) => {
+    const absQty = Math.abs(movement.quantity);
+    if (absQty === 0) return { data: null, error: null };
+
+    const localMovement: StockMovement = {
+      id: `mov-${Date.now()}`,
+      productId: movement.productId,
+      ingredientId: movement.ingredientId,
+      type: movement.type,
+      quantity: absQty,
+      reason: movement.reason || '',
+      createdAt: new Date(),
+    };
+
+    try {
+      if (!currentBusiness?.id) {
+        throw new Error('Negócio não encontrado');
+      }
+
+      const insertData: Record<string, unknown> = {
+        id: generateUUID(),
+        business_id: currentBusiness.id,
+        type: movement.type,
+        quantity: movement.type === 'entry' ? absQty : -absQty,
+        reason: movement.reason || '',
+        created_at: new Date().toISOString(),
+      };
+      if (movement.productId) insertData.product_id = movement.productId;
+      if (movement.ingredientId) insertData.ingredient_id = movement.ingredientId;
+
+      const { data, error } = await supabase
+        .from('stock_movements')
+        .insert(insertData)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      localMovement.id = data.id;
+      useStore.getState().addStockMovement(localMovement);
+      return { data: localMovement, error: null };
+    } catch (err: unknown) {
+      handleError(err, 'ADD_STOCK_MOVEMENT');
+      // Sem ligação: mantém o registo apenas local para não partir a UX
+      useStore.getState().addStockMovement(localMovement);
+      return { data: localMovement, error: null };
     }
   };
 
@@ -1052,6 +1146,7 @@ export function useDatabase() {
     ingredients,
     sales,
     credits,
+    stockMovements,
     salesByProduct,
     stockByMeal,
     profitByProduct,
@@ -1063,6 +1158,7 @@ export function useDatabase() {
     addIngredient,
     updateIngredient,
     deleteIngredient,
+    recordStockMovement,
     addSale,
     loadAllSales,
     addCredit,

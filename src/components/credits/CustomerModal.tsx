@@ -20,7 +20,8 @@ const CustomerModal = memo(function CustomerModal({ open, onClose, onSave, custo
     phone: '',
     email: '',
     address: '',
-    credit_limit: '5000',
+    nuit: '',
+    creditLimit: '5000',
     status: 'active' as 'active' | 'blocked' | 'inactive',
     notes: '',
   });
@@ -33,7 +34,8 @@ const CustomerModal = memo(function CustomerModal({ open, onClose, onSave, custo
         phone: customer.phone || '',
         email: customer.email || '',
         address: customer.address || '',
-        credit_limit: customer.credit_limit.toString(),
+        nuit: customer.nuit || '',
+        creditLimit: customer.creditLimit.toString(),
         status: customer.status,
         notes: customer.notes || '',
       });
@@ -43,7 +45,8 @@ const CustomerModal = memo(function CustomerModal({ open, onClose, onSave, custo
         phone: '',
         email: '',
         address: '',
-        credit_limit: '5000',
+        nuit: '',
+        creditLimit: '5000',
         status: 'active',
         notes: '',
       });
@@ -55,9 +58,14 @@ const CustomerModal = memo(function CustomerModal({ open, onClose, onSave, custo
     setLoading(true);
 
     const data = {
-      ...formData,
-      credit_limit: parseFloat(formData.credit_limit),
-      current_balance: customer?.current_balance || 0,
+      name: formData.name,
+      phone: formData.phone || undefined,
+      email: formData.email || undefined,
+      address: formData.address || undefined,
+      nuit: formData.nuit || undefined,
+      creditLimit: parseFloat(formData.creditLimit),
+      status: formData.status,
+      notes: formData.notes || undefined,
     };
 
     const result = await onSave(data);
@@ -98,28 +106,40 @@ const CustomerModal = memo(function CustomerModal({ open, onClose, onSave, custo
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="credit_limit">Limite de Crédito *</Label>
+              <Label htmlFor="nuit">NUIT</Label>
               <Input
-                id="credit_limit"
-                type="number"
-                step="0.01"
-                value={formData.credit_limit}
-                onChange={(e) => setFormData({ ...formData, credit_limit: e.target.value })}
-                required
+                id="nuit"
+                value={formData.nuit}
+                onChange={(e) => setFormData({ ...formData, nuit: e.target.value })}
+                placeholder="Nº de identificação fiscal"
                 disabled={loading}
               />
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              disabled={loading}
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                disabled={loading}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="creditLimit">Limite de Crédito *</Label>
+              <Input
+                id="creditLimit"
+                type="number"
+                step="0.01"
+                value={formData.creditLimit}
+                onChange={(e) => setFormData({ ...formData, creditLimit: e.target.value })}
+                required
+                disabled={loading}
+              />
+            </div>
           </div>
 
           <div className="space-y-2">

@@ -44,6 +44,7 @@ interface AppState {
   
   // Stock movements
   stockMovements: StockMovement[];
+  setStockMovements: (movements: StockMovement[]) => void;
   addStockMovement: (movement: StockMovement) => void;
   
   // Invoices
@@ -110,6 +111,7 @@ export const useStore = create<AppState>((set) => ({
   
   // Stock movements
   stockMovements: [],
+  setStockMovements: (movements) => set({ stockMovements: movements }),
   addStockMovement: (movement) => set((state) => ({
     stockMovements: [...state.stockMovements, movement],
   })),

@@ -2,7 +2,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'supervisor' | 'caixa';
+  role: 'admin' | 'supervisor' | 'caixa' | 'super_admin';
   avatar?: string;
 }
 
@@ -15,7 +15,7 @@ export interface AuthUser {
   };
 }
 
-export type BusinessRole = 'admin' | 'supervisor' | 'caixa';
+export type BusinessRole = 'admin' | 'supervisor' | 'caixa' | 'super_admin';
 
 export interface BusinessUser {
   id?: string;

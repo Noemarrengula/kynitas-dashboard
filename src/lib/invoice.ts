@@ -9,14 +9,14 @@ interface BusinessInfo {
 }
 
 function buildQRUrl(invoice: Invoice): string {
-  const data = [
+  const data = invoice.qrCodeData || [
     invoice.documentType,
     `${invoice.series}-${String(invoice.number).padStart(4, '0')}`,
     invoice.total.toFixed(2),
     invoice.ivaAmount.toFixed(2),
     invoice.atcud || '',
     invoice.hash || '',
-    invoice.createdAt,
+    new Date(invoice.createdAt).toISOString(),
   ].join('|');
   return `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(data)}`;
 }

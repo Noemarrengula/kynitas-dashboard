@@ -1,56 +1,145 @@
-import { useState, useCallback, memo } from 'react';
-import { ShoppingCart, Plus, Minus, X, Check, Receipt, FileText } from 'lucide-react';
-import { PaymentModal } from '@/components/sales/PaymentModal';
-import { useDatabase } from '@/hooks/useDatabase';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { PageHeader } from '@/components/ui/page-header';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { OrderItem, Product } from '@/types';
-import { toast } from '@/hooks/use-toast';
-import { cn, getErrorMessage, formatCurrency } from '@/lib/utils';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { useStore } from '@/store/useStore';
 import { useBusiness } from '@/contexts/BusinessContext';
-import { useI18n } from '@/contexts/I18nContext';
-import { sanitizeSaleData, sanitizeSearchQuery } from '@/lib/sanitize';
+import { useDatabase } from '@/hooks/useDatabase';
 import { useCashDrawer } from '@/hooks/useCashDrawer';
 import { useCredits } from '@/hooks/useCredits';
 import { useInvoices } from '@/hooks/useInvoices';
-import { printReceipt } from '@/lib/receipt';
+import { usePermissions } from '@/hooks/usePermissions';
+import { useTablesPersistence } from '@/hooks/useTablesPersistence';
+import { useOfflineSync } from '@/hooks/useOfflineSync';
+import { useAuditLog } from '@/hooks/useAuditLog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { toast } from '@/hooks/use-toast';
+import { getErrorMessage, formatCurrency } from '@/lib/utils';
+import { sanitizeSaleData, sanitizeSearchQuery } from '@/lib/sanitize';
+import { printReceipt, printPreBill } from '@/lib/receipt';
+import { getOnline } from '@/lib/offline';
+import { generateUUID } from '@/lib/uuid';
+import { getSuspendedSales, addSuspendedSale, removeSuspendedSale } from '@/lib/suspendedSales';
+import { PosToolbar } from '@/components/pos/PosToolbar';
+import { CategoryRail, ALL_CATEGORY } from '@/components/pos/CategoryRail';
+import { ProductGrid } from '@/components/pos/ProductGrid';
+import { OrderPanel } from '@/components/pos/OrderPanel';
+import { PaymentDialog } from '@/components/pos/PaymentDialog';
+import type { PaymentConfirm } from '@/components/pos/PaymentDialog';
+import { SaleSuccessPanel } from '@/components/pos/SaleSuccessPanel';
+import type { CompletedSaleInfo } from '@/components/pos/SaleSuccessPanel';
+import { SuspendedListSheet } from '@/components/pos/SuspendedListSheet';
+import type { Product } from '@/types';
+import type { Order } from '@/types';
+import type {
+  CartItem,
+  PosCustomer,
+  PosTableRef,
+  SaleDiscount,
+  SuspendedSale,
+} from '@/types/domains/pos';
+
+type SaleForPrint = Parameters<typeof printReceipt>[0];
 
 export default function Sales() {
   const { products, ingredients, addSale, loading } = useDatabase();
   const { business } = useBusiness();
   const { open: openCashDrawer } = useCashDrawer();
   const { registerCreditCharge } = useCredits();
-  const { issueInvoice, invoiceSeries } = useInvoices();
-  const { t } = useI18n();
-  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
-  const [lastSaleId, setLastSaleId] = useState<string | null>(null);
-  const [showInvoiceDialog, setShowInvoiceDialog] = useState(false);
-  const [selectedDocType, setSelectedDocType] = useState<'FS' | 'FT' | 'FC'>('FS');
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const { issueInvoice } = useInvoices();
+  const { can } = usePermissions();
+  const { updateOrder, updateTable, addOrder } = useTablesPersistence();
+  const { online, pendingCount } = useOfflineSync();
+  const { log: auditLog } = useAuditLog();
+  const tables = useStore(s => s.tables);
+  const orders = useStore(s => s.orders);
+
+  const businessId = business?.id;
+
+  // Mesa pré-seleccionada via ?mesa=<id> (vinda do mapa de Mesas)
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [sendingKitchen, setSendingKitchen] = useState(false);
+  const [kitchenSentRef, setKitchenSentRef] = useState<string | null>(null);
+
+  // Carrinho
+  const [orderItems, setOrderItems] = useState<CartItem[]>([]);
+  const [discount, setDiscount] = useState<SaleDiscount>({ type: 'percent', value: 0 });
+  const [customer, setCustomer] = useState<PosCustomer | null>(null);
+  const [table, setTable] = useState<PosTableRef | null>(null);
+  const [lastRemoved, setLastRemoved] = useState<CartItem[] | null>(null);
+  const [completedSale, setCompletedSale] = useState<CompletedSaleInfo | null>(null);
+
+  // Pesquisa e categoria
+  const [search, setSearch] = useState('');
+  const [category, setCategory] = useState<string>(ALL_CATEGORY);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Diálogos de produto (fracionável e preço por peso)
+  const [showFractionDialog, setShowFractionDialog] = useState(false);
+  const [fractionProduct, setFractionProduct] = useState<Product | null>(null);
+  const [bottleQty, setBottleQty] = useState(0);
+  const [shotQty, setShotQty] = useState(0);
   const [showCustomPriceDialog, setShowCustomPriceDialog] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [customPrice, setCustomPrice] = useState('');
 
-  const [showFractionDialog, setShowFractionDialog] = useState(false);
-  const [discountPercent, setDiscountPercent] = useState(0);
-  const [fractionProduct, setFractionProduct] = useState<Product | null>(null);
-  const [bottleQty, setBottleQty] = useState(0);
-  const [shotQty, setShotQty] = useState(0);
+  // Pagamento / factura
+  const [paymentOpen, setPaymentOpen] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const processingRef = useRef(false);
+  const [lastSaleId, setLastSaleId] = useState<string | null>(null);
+  const printCopiesRef = useRef<SaleForPrint | null>(null);
+  const [showInvoiceDialog, setShowInvoiceDialog] = useState(false);
+  const [emittingInvoice, setEmittingInvoice] = useState(false);
+  const [invoiceError, setInvoiceError] = useState<string | null>(null);
+  const [selectedDocType, setSelectedDocType] = useState<'FS' | 'FT' | 'FC'>('FS');
+  const [clientName, setClientName] = useState('');
+  const [clientNuit, setClientNuit] = useState('');
 
-  const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<'all' | 'drink' | 'meal' | 'cigarette'>('all');
+  // Vendas suspensas
+  const [suspendedSheetOpen, setSuspendedSheetOpen] = useState(false);
+  const [orderSheetOpen, setOrderSheetOpen] = useState(false);
+  const [suspendedSales, setSuspendedSales] = useState<SuspendedSale[]>([]);
+
+  useEffect(() => {
+    setSuspendedSales(getSuspendedSales(businessId));
+  }, [businessId]);
 
   const safeSearch = sanitizeSearchQuery(search);
 
+  const categories = Array.from(new Set(products.map(p => p.category).filter(Boolean) as string[]))
+    .sort((a, b) => a.localeCompare(b, 'pt'));
+
+  const counts: Record<string, number> = { [ALL_CATEGORY]: products.length };
+  for (const c of categories) {
+    counts[c] = products.filter(p => p.category === c).length;
+  }
+
   const filteredProducts = products.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(safeSearch.toLowerCase());
-    const matchesFilter = filter === 'all' || p.type === filter;
-    return matchesSearch && matchesFilter;
+    const matchesSearch = !safeSearch || p.name.toLowerCase().includes(safeSearch.toLowerCase());
+    const matchesCategory = category === ALL_CATEGORY || p.category === category;
+    return matchesSearch && matchesCategory;
   });
+
+  const searchResults = (() => {
+    if (!safeSearch) return [];
+    return products
+      .filter(p => p.name.toLowerCase().includes(safeSearch.toLowerCase()))
+      .sort((a, b) => a.name.localeCompare(b.name, 'pt'))
+      .slice(0, 6);
+  })();
+
+  const subtotal = orderItems.reduce((acc, item) => acc + item.subtotal, 0);
+  const discountAmount =
+    discount.type === 'percent'
+      ? (subtotal * discount.value) / 100
+      : Math.min(discount.value, subtotal);
+  const total = Math.max(0, subtotal - discountAmount);
+
+  const uidForProduct = (product: Product) => product.id;
+  const uidForFraction = (product: Product, kind: 'bottle' | 'shot') => `${product.id}#${kind}`;
 
   const addItemToOrder = (product: Product, useCustomPrice = false) => {
     if (product.stock <= 0) {
@@ -62,7 +151,6 @@ export default function Sales() {
       return;
     }
 
-    // Se o produto é fracionável (doses/shots), mostrar diálogo de seleção
     if (product.fracionavel) {
       setFractionProduct(product);
       setBottleQty(0);
@@ -71,17 +159,16 @@ export default function Sales() {
       return;
     }
 
-    // Se o produto tem "KG" no nome, mostrar diálogo de preço personalizado
     if (!useCustomPrice && product.name.toUpperCase().includes('KG')) {
       setSelectedProduct(product);
       setCustomPrice('');
       setShowCustomPriceDialog(true);
       return;
     }
-    
+
     const existingItem = orderItems.find(i => i.productId === product.id);
     const currentQty = existingItem ? existingItem.quantity : 0;
-    
+
     if (currentQty >= product.stock) {
       toast({
         title: 'Stock insuficiente',
@@ -90,7 +177,7 @@ export default function Sales() {
       });
       return;
     }
-    
+
     if (existingItem) {
       setOrderItems(orderItems.map(i =>
         i.productId === product.id
@@ -100,14 +187,14 @@ export default function Sales() {
     } else {
       setOrderItems([
         ...orderItems,
-        { productId: product.id, product, quantity: 1, subtotal: product.price }
+        { productId: product.id, uid: uidForProduct(product), product, quantity: 1, subtotal: product.price },
       ]);
     }
   };
 
-  const addItemWithCustomPrice = useCallback(() => {
+  const addItemWithCustomPrice = () => {
     if (!selectedProduct) return;
-    
+
     const price = parseFloat(customPrice);
     if (isNaN(price) || price <= 0) {
       toast({
@@ -119,28 +206,29 @@ export default function Sales() {
     }
 
     const productWithCustomPrice = { ...selectedProduct, price };
-    
+
     setOrderItems([
       ...orderItems,
-      { 
-        productId: selectedProduct.id, 
-        product: productWithCustomPrice, 
-        quantity: 1, 
-        subtotal: price 
-      }
+      {
+        productId: selectedProduct.id,
+        uid: uidForProduct(selectedProduct),
+        product: productWithCustomPrice,
+        quantity: 1,
+        subtotal: price,
+      },
     ]);
 
     setShowCustomPriceDialog(false);
     setSelectedProduct(null);
     setCustomPrice('');
-    
+
     toast({
       title: 'Produto adicionado',
       description: `${selectedProduct.name} - ${price.toLocaleString('pt-MZ')} MT`,
     });
-  }, [selectedProduct, customPrice, orderItems]);
+  };
 
-  const addFractionItems = useCallback(() => {
+  const addFractionItems = () => {
     if (!fractionProduct) return;
 
     if (bottleQty <= 0 && shotQty <= 0) {
@@ -152,7 +240,6 @@ export default function Sales() {
       return;
     }
 
-    // Stock validation
     const existingBottleItem = orderItems.find(
       i => i.productId === fractionProduct.id && i.product?.name?.includes('(Garrafa)')
     );
@@ -162,7 +249,9 @@ export default function Sales() {
     const existingBottles = existingBottleItem ? existingBottleItem.quantity : 0;
     const existingShots = existingShotItem ? existingShotItem.quantity : 0;
     const dosesPerBottle = fractionProduct.dosesPorGarrafa || 1;
-    const totalBottlesNeeded = existingBottles + bottleQty + Math.ceil((existingShots + shotQty) / dosesPerBottle);
+    const totalBottlesNeeded =
+      existingBottles + bottleQty + Math.ceil((existingShots + shotQty) / dosesPerBottle);
+
     if (totalBottlesNeeded > fractionProduct.stock) {
       toast({
         title: 'Stock insuficiente',
@@ -172,9 +261,8 @@ export default function Sales() {
       return;
     }
 
-    const newItems: OrderItem[] = [];
+    const newItems: CartItem[] = [];
 
-    // Adicionar garrafas
     if (bottleQty > 0) {
       const bottleProduct = { ...fractionProduct, name: `${fractionProduct.name} (Garrafa)` };
       const existingBottle = orderItems.find(
@@ -190,6 +278,7 @@ export default function Sales() {
       } else {
         newItems.push({
           productId: fractionProduct.id,
+          uid: uidForFraction(fractionProduct, 'bottle'),
           product: bottleProduct,
           quantity: bottleQty,
           subtotal: bottleQty * fractionProduct.price,
@@ -197,7 +286,6 @@ export default function Sales() {
       }
     }
 
-    // Adicionar doses
     if (shotQty > 0 && fractionProduct.precoDose) {
       const shotProduct = { ...fractionProduct, name: `${fractionProduct.name} (Dose)`, price: fractionProduct.precoDose };
       const existingShot = orderItems.find(
@@ -213,6 +301,7 @@ export default function Sales() {
       } else {
         newItems.push({
           productId: fractionProduct.id,
+          uid: uidForFraction(fractionProduct, 'shot'),
           product: shotProduct,
           quantity: shotQty,
           subtotal: shotQty * (fractionProduct.precoDose || 0),
@@ -228,19 +317,21 @@ export default function Sales() {
     setFractionProduct(null);
     setBottleQty(0);
     setShotQty(0);
-  }, [fractionProduct, bottleQty, shotQty, orderItems]);
+  };
 
+  // Cota máxima por produto é validada dentro de updateItemQuantity como antes
   const updateItemQuantity = (productId: string, delta: number) => {
     const item = orderItems.find(i => i.productId === productId);
     if (!item) return;
 
     const newQuantity = item.quantity + delta;
-    
+
     if (newQuantity <= 0) {
+      setLastRemoved(orderItems.filter(i => i.productId === productId));
       setOrderItems(orderItems.filter(i => i.productId !== productId));
       return;
     }
-    
+
     if (newQuantity > (item.product?.stock ?? 0)) {
       toast({
         title: 'Stock insuficiente',
@@ -249,7 +340,7 @@ export default function Sales() {
       });
       return;
     }
-    
+
     setOrderItems(orderItems.map(i =>
       i.productId === productId
         ? { ...i, quantity: newQuantity, subtotal: newQuantity * (i.product?.price ?? 0) }
@@ -258,23 +349,53 @@ export default function Sales() {
   };
 
   const removeItem = (productId: string) => {
+    const removed = orderItems.filter(i => i.productId === productId);
+    if (removed.length === 0) return;
+    setLastRemoved(removed);
     setOrderItems(orderItems.filter(i => i.productId !== productId));
   };
 
-  const total = orderItems.reduce((acc, item) => acc + item.subtotal, 0);
-  const discountAmount = total * (discountPercent / 100);
-  const finalTotal = total - discountAmount;
+  const undoRemove = () => {
+    if (!lastRemoved) return;
+    setOrderItems(prev => [...prev, ...lastRemoved]);
+    setLastRemoved(null);
+  };
 
-  const handlePaymentConfirm = useCallback(async (payment: { cash: number; mpesa: number; emola: number; card: number }) => {
+  const setItemNote = (uid: string, note: string) => {
+    setOrderItems(prev =>
+      prev.map(i => (i.uid === uid ? { ...i, note } : i))
+    );
+  };
+
+  const handleNewSale = useCallback(() => {
+    setOrderItems([]);
+    setDiscount({ type: 'percent', value: 0 });
+    setCustomer(null);
+    setTable(null);
+    setLastRemoved(null);
+    setCompletedSale(null);
+    setLastSaleId(null);
+    setSearch('');
+    setCategory(ALL_CATEGORY);
+    setOrderSheetOpen(false);
+    setPaymentOpen(false);
+    setSuspendedSheetOpen(false);
+  }, []);
+
+  // --- Pagamento ---
+  const handlePaymentConfirm = async (payment: PaymentConfirm) => {
+    if (processingRef.current) return;
+    processingRef.current = true;
+    setProcessing(true);
     try {
       const totalReceived = payment.cash + payment.mpesa + payment.emola + payment.card;
-      const effectiveTotal = discountPercent > 0 ? finalTotal : total;
+      const effectiveTotal = discountAmount > 0 ? total : subtotal;
       const change = totalReceived - effectiveTotal;
 
       const saleData = {
         items: orderItems,
         total: effectiveTotal,
-        discount: discountPercent,
+        discount: discount.type === 'percent' ? discount.value : 0,
         paymentDetails: {
           cash: payment.cash,
           mpesa: payment.mpesa,
@@ -287,92 +408,133 @@ export default function Sales() {
         createdAt: new Date(),
       };
 
+      if (table) {
+        Object.assign(saleData, {
+          tableId: table.id,
+          table_number: table.number,
+          table_name: table.name,
+          table_customer_name: table.customerName,
+        });
+      }
+
       const sanitizedSale = sanitizeSaleData(saleData);
       const { data: savedSale, error } = await addSale(sanitizedSale);
-      
+
       if (error) {
         throw error;
       }
 
       setLastSaleId(savedSale.id);
 
-      // Abrir gaveta se pagamento em dinheiro
       if (payment.cash > 0) {
         await openCashDrawer();
       }
 
-      setShowPaymentModal(false);
-      setOrderItems([]);
-      
-      // Preparar dados para impressão
-      const saleForPrint = savedSale ? {
-        ...savedSale,
-        items: orderItems,
-        total: total,
-        paymentDetails: savedSale.paymentDetails || saleData.paymentDetails,
-        createdAt: savedSale.createdAt || saleData.createdAt
-      } : { ...saleData, id: `sale-${Date.now()}` };
-
-      console.log('Preparando impressão...', saleForPrint);
-
-    // Check for low stock
-    const lowStockItems = orderItems.filter(item => {
-      const product = products.find(p => p.id === item.productId);
-      return product && (product.stock - item.quantity) <= 5;
-    });
-
-    // Check for low ingredients
-    const lowIngredients: string[] = [];
-    orderItems.forEach(item => {
-      const product = products.find(p => p.id === item.productId);
-      if (product?.recipe) {
-        product.recipe.forEach(recipeItem => {
-          const ingredient = ingredients.find(i => i.id === recipeItem.ingredientId);
-          if (ingredient) {
-            const newStock = ingredient.stock - (recipeItem.quantity * item.quantity);
-            if (newStock <= ingredient.minStock && !lowIngredients.includes(ingredient.name)) {
-              lowIngredients.push(ingredient.name);
-            }
-          }
-        });
+      if (table?.linkedOrderId) {
+        try {
+          const paymentMethod = payment.mpesa > 0 ? 'mpesa' : payment.cash > 0 ? 'cash' : 'card';
+          await updateOrder(table.linkedOrderId, { status: 'paid', paymentMethod });
+          await updateTable(table.id, { status: 'free', closed_at: new Date() });
+        } catch {
+          // Falha ao sincronizar a mesa não deve bloquear a venda
+        }
       }
-    });
 
-    toast({
-      title: 'Venda registrada com sucesso!',
-      description: change > 0 ? `Troco: ${change.toFixed(2)} MT` : 'Pagamento completo',
-    });
+      // Preparar dados para impressão
+      const saleForPrint: SaleForPrint = {
+        id: savedSale.id,
+        createdAt: (savedSale.createdAt as Date)?.toString() ?? new Date().toString(),
+        sale_number: savedSale.saleNumber ? String(savedSale.saleNumber) : undefined,
+        tableId: table?.id,
+        customer_name: customer?.name,
+        items: orderItems,
+        total,
+        paymentDetails: savedSale.paymentDetails || saleData.paymentDetails,
+      };
+      printCopiesRef.current = saleForPrint;
 
-    // Imprimir recibos
-    setTimeout(() => {
-      printReceipt(saleForPrint, 'client', business);
-      setTimeout(() => printReceipt(saleForPrint, 'merchant', business), 500);
-    }, 300);
+      setPaymentOpen(false);
+      setOrderItems([]);
+      setDiscount({ type: 'percent', value: 0 });
+      setCustomer(null);
+      setTable(null);
+      setLastRemoved(null);
+      setSearch('');
+      setCategory(ALL_CATEGORY);
 
-    if (lowStockItems.length > 0 || lowIngredients.length > 0) {
-      setTimeout(() => {
-        const messages = [];
-        if (lowStockItems.length > 0) messages.push(`${lowStockItems.length} produto(s)`);
-        if (lowIngredients.length > 0) messages.push(`${lowIngredients.length} ingrediente(s)`);
-        toast({
-          title: 'Alerta de Stock!',
-          description: `${messages.join(' e ')} com stock crítico`,
-          variant: 'destructive',
-        });
-      }, 1000);
-    }
+      const methodLabel = buildMethodLabel(payment);
+      setCompletedSale({
+        id: savedSale.id,
+        saleNumber: savedSale.saleNumber,
+        total: effectiveTotal,
+        itemsCount: orderItems.length,
+        methodLabel,
+        isOffline: !getOnline(),
+      });
 
-    } catch (error: unknown) {
-      console.error('Erro ao processar pagamento:', error);
+      // Verificar stock baixo de produtos
+      const lowStockItems = orderItems.filter(item => {
+        const product = products.find(p => p.id === item.productId);
+        return product && (product.stock - item.quantity) <= 5;
+      });
+
+      // Verificar ingredientes em falta
+      const lowIngredients: string[] = [];
+      orderItems.forEach(item => {
+        const product = products.find(p => p.id === item.productId);
+        if (product?.recipe) {
+          product.recipe.forEach(recipeItem => {
+            const ingredient = ingredients.find(i => i.id === recipeItem.ingredientId);
+            if (ingredient) {
+              const newStock = ingredient.stock - recipeItem.quantity * item.quantity;
+              if (newStock <= ingredient.minStock && !lowIngredients.includes(ingredient.name)) {
+                lowIngredients.push(ingredient.name);
+              }
+            }
+          });
+        }
+      });
+
       toast({
-        title: 'Erro ao processar venda',
+        title: 'Venda registada com sucesso!',
+        description: change > 0 ? `Troco: ${change.toFixed(2)} MT` : 'Pagamento completo',
+      });
+
+      // Impressão automática (comportamento preservado)
+      setTimeout(() => {
+        printReceipt(saleForPrint, 'client', business);
+        setTimeout(() => printReceipt(saleForPrint, 'merchant', business), 500);
+      }, 300);
+
+      if (lowStockItems.length > 0 || lowIngredients.length > 0) {
+        setTimeout(() => {
+          const messages: string[] = [];
+          if (lowStockItems.length > 0) messages.push(`${lowStockItems.length} produto(s)`);
+          if (lowIngredients.length > 0) messages.push(`${lowIngredients.length} ingrediente(s)`);
+          toast({
+            title: 'Alerta de Stock!',
+            description: `${messages.join(' e ')} com stock crítico`,
+            variant: 'destructive',
+          });
+        }, 1000);
+      }
+    } catch (error: unknown) {
+      console.error('Erro ao processar venda:', error);
+      toast({
+        title: 'Não foi possível concluir a venda',
         description: getErrorMessage(error, 'Tente novamente'),
         variant: 'destructive',
       });
+    } finally {
+      processingRef.current = false;
+      setProcessing(false);
     }
-  }, [total, finalTotal, discountPercent, orderItems, products, ingredients, addSale, business, openCashDrawer]);
+  };
 
-  const handleCreditConfirm = useCallback(async (customerName: string) => {
+  const handleCreditConfirm = async (customerName: string) => {
+    if (processingRef.current) return;
+    processingRef.current = true;
+    setProcessing(true);
     try {
       if (!customerName.trim()) {
         toast({
@@ -383,26 +545,37 @@ export default function Sales() {
         return;
       }
 
-      const result = await registerCreditCharge(
-        customerName.trim(),
-        orderItems,
-        total
-      );
+      const result = await registerCreditCharge(customerName.trim(), orderItems, total);
 
       if (!result.success) {
-        throw new Error(result.error || 'Erro ao registrar crédito');
+        throw new Error(result.error || 'Erro ao registar crédito');
       }
 
-      setShowPaymentModal(false);
+      setPaymentOpen(false);
       setOrderItems([]);
+      setDiscount({ type: 'percent', value: 0 });
+      setCustomer(null);
+      setTable(null);
+      setLastRemoved(null);
+      setSearch('');
+      setCategory(ALL_CATEGORY);
 
-      const creditForPrint = {
-        id: `credit-${Date.now()}`,
-        customerName,
+      const creditForPrint: SaleForPrint = {
+        id: result.saleId ?? `credit-${Date.now()}`,
+        createdAt: new Date().toString(),
+        customer_name: customerName,
         items: orderItems,
-        total: total,
-        createdAt: new Date(),
+        total,
+        paymentDetails: { cash: 0, mpesa: 0, emola: 0, card: 0, total: 0, change: 0 },
       };
+      printCopiesRef.current = creditForPrint;
+
+      setCompletedSale({
+        id: result.saleId ?? `credit-${Date.now()}`,
+        total,
+        itemsCount: orderItems.length,
+        methodLabel: 'Crédito',
+      });
 
       setTimeout(() => {
         printReceipt(creditForPrint, 'client', business);
@@ -410,7 +583,7 @@ export default function Sales() {
       }, 300);
 
       toast({
-        title: 'Crédito registrado com sucesso!',
+        title: 'Crédito registado com sucesso!',
         description: `${customerName} levará ${orderItems.length} produto(s)`,
       });
     } catch (error: unknown) {
@@ -419,10 +592,19 @@ export default function Sales() {
         title: 'Erro ao registar crédito',
         description: getErrorMessage(error, 'Tente novamente'),
       });
+    } finally {
+      processingRef.current = false;
+      setProcessing(false);
     }
-  }, [orderItems, total, registerCreditCharge, business]);
+  };
 
-  const printPreBill = useCallback(() => {
+  const handleReprint = (copy: 'client' | 'merchant') => {
+    if (!printCopiesRef.current) return;
+    printReceipt(printCopiesRef.current, copy, business);
+  };
+
+  // --- Pré-conta ---
+  const handlePrintPrebill = useCallback(() => {
     if (orderItems.length === 0) {
       toast({
         title: 'Carrinho vazio',
@@ -431,293 +613,372 @@ export default function Sales() {
       });
       return;
     }
-
     try {
-      const iframe = document.createElement('iframe');
-      iframe.style.position = 'absolute';
-      iframe.style.width = '0';
-      iframe.style.height = '0';
-      iframe.style.border = 'none';
-      document.body.appendChild(iframe);
-      
-      const doc = iframe.contentWindow?.document;
-      if (!doc) return;
-      
-      doc.open();
-      doc.write(generatePreBillHTML());
-      doc.close();
-      
-      setTimeout(() => {
-        iframe.contentWindow?.focus();
-        iframe.contentWindow?.print();
-        setTimeout(() => {
-          if (document.body.contains(iframe)) {
-            document.body.removeChild(iframe);
-          }
-        }, 1000);
-      }, 100);
+      printPreBill(orderItems, table?.name, business);
     } catch (error) {
-      console.error('Erro ao imprimir:', error);
+      console.error('Erro ao imprimir pré-conta:', error);
+      toast({
+        title: 'Erro ao imprimir',
+        description: 'Tente novamente',
+        variant: 'destructive',
+      });
     }
-  }, [orderItems, generatePreBillHTML]);
+  }, [orderItems, table, business]);
 
-  function generatePreBillHTML() {
-    const formatCurrency = (value: number) => `${value.toFixed(2)} MT`;
-    const centerText = (text: string, width = 48) => {
-      const padding = Math.max(0, Math.floor((width - text.length) / 2));
-      return ' '.repeat(padding) + text;
+  // --- Vendas suspensas ---
+  const handleSuspend = () => {
+    if (orderItems.length === 0) {
+      toast({
+        title: 'Pedido vazio',
+        description: 'Adicione produtos antes de suspender a venda',
+        variant: 'destructive',
+      });
+      return;
+    }
+    const suspended: SuspendedSale = {
+      id: generateUUID(),
+      ref: `Suspensa #${Date.now().toString().slice(-4)}`,
+      items: orderItems,
+      discount,
+      customer,
+      table,
+      total,
+      createdAt: new Date().toISOString(),
     };
-    const line = (char: string, width = 48) => char.repeat(width);
-    const formatLine = (left: string, right: string, width = 48) => {
-      const spaces = width - left.length - right.length;
-      return left + ' '.repeat(Math.max(1, spaces)) + right;
-    };
-
-    const bill = [];
-    bill.push(centerText(business?.name || 'KYNITAS BAR'));
-    bill.push(centerText('Bar & Restaurante'));
-    if (business?.address) bill.push(centerText(business.address));
-    if (business?.phone) bill.push(centerText('Tel: ' + business.phone));
-    bill.push('');
-    bill.push(line('='));
-    bill.push('');
-    bill.push(centerText('*** PRE-CONTA ***'));
-    bill.push('');
-    bill.push('Data: ' + new Date().toLocaleString('pt-MZ'));
-    bill.push('');
-    bill.push(line('-'));
-    bill.push('');
-    bill.push('ITENS:');
-    bill.push('');
-    
-    orderItems.forEach((item) => {
-      bill.push(item.product?.name ?? 'Produto');
-      bill.push(formatLine(`  ${item.quantity}x ${formatCurrency(item.product?.price ?? 0)}`, formatCurrency(item.subtotal)));
+    if (businessId) {
+      addSuspendedSale(businessId, suspended);
+      setSuspendedSales(getSuspendedSales(businessId));
+    }
+    setOrderItems([]);
+    setDiscount({ type: 'percent', value: 0 });
+    setLastRemoved(null);
+    toast({
+      title: 'Venda suspensa',
+      description: `${suspended.ref} guardada. Pode retomar quando quiser.`,
     });
-    
-    bill.push('');
-    bill.push(line('-'));
-    bill.push('');
-    bill.push(formatLine('TOTAL A PAGAR:', formatCurrency(total)));
-    bill.push('');
-    bill.push(line('='));
-    bill.push('');
-    bill.push(centerText('METODOS DE PAGAMENTO'));
-    bill.push('');
-    bill.push('M-Pesa (Levantamento):');
-    bill.push(centerText('414162'));
-    bill.push('');
-    bill.push('E-Mola (Levantamento):');
-    bill.push(centerText('98580'));
-    bill.push('');
-    bill.push('Cartao (P.O.S):');
-    bill.push(centerText('Disponivel'));
-    bill.push('');
-    bill.push('Numerario (Dinheiro):');
-    bill.push(centerText('Aceite'));
-    bill.push('');
-    bill.push(line('='));
-    bill.push('');
-    bill.push(centerText('Obrigado pela preferencia!'));
-    bill.push(centerText('Aguardamos o seu pagamento'));
-    bill.push('');
+  };
 
-    return `<!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="UTF-8">
-          <title>Pre-Conta</title>
-          <style>
-            @page { 
-              size: 80mm auto; 
-              margin: 0;
-            }
-            * {
-              margin: 0;
-              padding: 0;
-              box-sizing: border-box;
-              -webkit-print-color-adjust: exact !important;
-              print-color-adjust: exact !important;
-              color-adjust: exact !important;
-            }
-            body { 
-              font-family: 'Courier New', Courier, monospace;
-              font-size: 13px;
-              line-height: 1.4;
-              width: 80mm;
-              margin: 0;
-              padding: 5mm;
-              background: #fff;
-              color: #000;
-              font-weight: bold;
-            }
-            pre, strong { 
-              margin: 0;
-              padding: 0;
-              white-space: pre;
-              font-family: inherit;
-              font-size: inherit;
-              color: #000;
-              font-weight: bold;
-            }
-            @media print {
-              * {
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-                color-adjust: exact !important;
-              }
-              body { 
-                padding: 2mm;
-                background: #fff !important;
-                color: #000 !important;
-                font-weight: bold !important;
-              }
-              pre, strong {
-                color: #000 !important;
-                font-weight: bold !important;
-              }
-            }
-          </style>
-        </head>
-        <body><pre><strong>${bill.join('\n')}</strong></pre></body>
-      </html>`;
-  }
+  const handleResumeSuspended = (sale: SuspendedSale) => {
+    setOrderItems(sale.items);
+    setDiscount(sale.discount);
+    setCustomer(sale.customer);
+    setTable(sale.table);
+    if (businessId) {
+      setSuspendedSales(removeSuspendedSale(businessId, sale.id));
+    }
+    setSuspendedSheetOpen(false);
+    toast({
+      title: 'Venda retomada',
+      description: `${sale.ref} carregada no pedido.`,
+    });
+  };
+
+  const handleRemoveSuspended = (id: string) => {
+    if (!businessId) return;
+    setSuspendedSales(removeSuspendedSale(businessId, id));
+  };
+
+  // --- Mesas ---
+  const handleSelectTable = (ref: PosTableRef) => {
+    setTable(ref);
+    if (orderItems.length === 0 && ref.linkedOrderId) {
+      const order = orders.find(o => o.id === ref.linkedOrderId && o.status !== 'paid');
+      if (order && order.items.length > 0) {
+        setOrderItems(order.items.map(o => ({
+          ...o,
+          uid: o.product?.name?.includes('(Garrafa)')
+            ? `${o.productId}#bottle`
+            : o.product?.name?.includes('(Dose)')
+              ? `${o.productId}#shot`
+              : o.productId,
+        })));
+        toast({
+          title: 'Pedido da mesa carregado',
+          description: `Mesa ${ref.number} — ${order.items.length} ${order.items.length === 1 ? 'item' : 'itens'}`,
+        });
+      }
+    }
+  };
+
+  // Vindo do mapa de Mesas: pré-selecciona a mesa e carrega o pedido existente
+  useEffect(() => {
+    const mesaId = searchParams.get('mesa');
+    if (!mesaId) return;
+    const tableRef = tables.find(t => t.id === mesaId);
+    if (tableRef) {
+      setTable({
+        id: tableRef.id,
+        number: tableRef.number,
+        name: tableRef.name,
+        customerName: tableRef.customer_name,
+        linkedOrderId: tableRef.currentOrderId,
+      });
+    }
+    setSearchParams({}, { replace: true });
+  }, [searchParams, tables, setSearchParams]);
+
+  // Carrega o pedido da mesa assim que os dados estiverem disponíveis
+  useEffect(() => {
+    if (!table?.linkedOrderId || orderItems.length > 0) return;
+    const order = orders.find(o => o.id === table.linkedOrderId && o.status !== 'paid');
+    if (order && order.items.length > 0) {
+      setOrderItems(order.items.map(o => ({
+        ...o,
+        uid: o.product?.name?.includes('(Garrafa)')
+          ? `${o.productId}#bottle`
+          : o.product?.name?.includes('(Dose)')
+            ? `${o.productId}#shot`
+            : o.productId,
+      })));
+      toast({
+        title: 'Pedido da mesa carregado',
+        description: `Mesa ${table.number} — ${order.items.length} ${order.items.length === 1 ? 'item' : 'itens'}`,
+      });
+    }
+  }, [table, orderItems.length, orders]);
+
+  const handleSendToKitchen = async () => {
+    if (orderItems.length === 0) {
+      toast({
+        title: 'Pedido vazio',
+        description: 'Adicione produtos antes de enviar à cozinha',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (!table) {
+      toast({
+        title: 'Selecione uma mesa',
+        description: 'O pedido enviado à cozinha deve estar associado a uma mesa.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (sendingKitchen) return;
+    setSendingKitchen(true);
+    try {
+      const orderId = table.linkedOrderId ?? `order-${generateUUID()}`;
+      const orderPayload: Order = {
+        id: orderId,
+        tableId: table.id,
+        tableName: table.name,
+        table_number: table.number,
+        items: orderItems.map(i => ({
+          productId: i.productId,
+          product: i.product ? { name: i.product.name, price: i.product.price } : undefined,
+          quantity: i.quantity,
+          subtotal: i.subtotal,
+          ...(i.note ? { note: i.note } : {}),
+        })),
+        status: 'pending',
+        total: orderItems.reduce((s, i) => s + i.subtotal, 0),
+        createdAt: new Date(),
+      };
+      await addOrder(orderPayload);
+
+      const existingOrder = orders.find(o => o.id === orderId);
+      await updateTable(table.id, {
+        status: 'occupied',
+        currentOrderId: orderId,
+        opened_at: existingOrder?.createdAt ?? new Date(),
+        ...(customer?.name ? { customer_name: customer.name } : {}),
+      });
+
+      setTable({ ...table, linkedOrderId: orderId });
+      setKitchenSentRef(
+        orderId.startsWith('order-') ? orderId.slice(6).slice(-4).toUpperCase() : orderId.slice(0, 4).toUpperCase()
+      );
+      auditLog('order_sent', 'orders', orderId, { tableId: table.id, items: orderItems.length });
+      toast({
+        title: 'Pedido enviado à cozinha',
+        description: `Mesa ${table.number} — ${orderItems.length} ${orderItems.length === 1 ? 'item' : 'itens'}`,
+      });
+    } catch (error: unknown) {
+      console.error('Erro ao enviar pedido:', error);
+      toast({
+        title: 'Erro ao enviar pedido',
+        description: getErrorMessage(error, 'Tente novamente'),
+        variant: 'destructive',
+      });
+    } finally {
+      setSendingKitchen(false);
+    }
+  };
+
+  // --- Atalhos de teclado ---
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'F2') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      } else if (e.key === 'F1') {
+        e.preventDefault();
+        handleNewSale();
+      } else if (e.key === 'F9') {
+        e.preventDefault();
+        if (orderItems.length > 0 && !completedSale && !processingRef.current) {
+          setPaymentOpen(true);
+        }
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [orderItems.length, completedSale, handleNewSale]);
+
+  const canAmountDiscount = can('precos_margens');
+
+  const renderOrderPanel = (fillHeight = false) => (
+    <OrderPanel
+      items={orderItems}
+      customer={customer}
+      table={table}
+      discount={discount}
+      discountAmount={discountAmount}
+      subtotal={subtotal}
+      total={total}
+      canAmountDiscount={canAmountDiscount}
+      onIncrement={updateItemQuantity}
+      onRemove={removeItem}
+      onSetNote={setItemNote}
+      onDiscountChange={setDiscount}
+      onOpenPayment={() => setPaymentOpen(true)}
+      onPrintPrebill={handlePrintPrebill}
+      onSuspend={handleSuspend}
+      onSendToKitchen={handleSendToKitchen}
+      canSendToKitchen={Boolean(table)}
+      sendingKitchen={sendingKitchen}
+      sentOrderRef={kitchenSentRef}
+      lastRemoved={lastRemoved?.[0] ?? null}
+      onUndoRemove={undoRemove}
+      disabled={Boolean(completedSale)}
+      className={fillHeight ? 'h-full' : ''}
+    />
+  );
+
+  const renderSuccessPanel = () => (
+    <SaleSuccessPanel
+      sale={completedSale as CompletedSaleInfo}
+      showInvoice={Boolean(lastSaleId)}
+      onPrint={handleReprint}
+      onNewSale={handleNewSale}
+      onEmitInvoice={() => {
+        setClientName(customer?.name ?? '');
+        setShowInvoiceDialog(true);
+      }}
+    />
+  );
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <PageHeader
-        icon={<ShoppingCart className="h-6 w-6" />}
-        title={t('nav.sales')}
-        description="Realizar vendas directas"
+    <div className="flex flex-col gap-3 lg:h-[calc(100dvh-8.5rem)] min-h-[540px]">
+      <PosToolbar
+        search={search}
+        onSearchChange={setSearch}
+        searchResults={searchResults}
+        onAddResult={addItemToOrder}
+        onNewSale={handleNewSale}
+        searchInputRef={searchInputRef}
+        online={online}
+        pendingCount={pendingCount}
+        suspendedCount={suspendedSales.length}
+        onOpenSuspended={() => setSuspendedSheetOpen(true)}
+        customer={customer}
+        onSelectCustomer={setCustomer}
+        canCredit={can('creditos')}
+        table={table}
+        onSelectTable={handleSelectTable}
+        onClearTable={() => setTable(null)}
+        tables={tables}
+        orders={orders}
       />
 
-      <div className="grid lg:grid-cols-3 gap-6">
-        {/* Products */}
-        <div className="lg:col-span-2 space-y-4">
-          {/* Filters */}
-          <div className="flex gap-4">
-            <Input
-              placeholder="Pesquisar produto..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="flex-1"
-            />
-            <div className="flex gap-1 bg-muted rounded-lg p-1">
-              {[
-                { value: 'all', label: 'Todos' },
-                { value: 'drink', label: 'Bebidas' },
-                { value: 'meal', label: 'Refeições' },
-                { value: 'cigarette', label: 'Cigarros' },
-              ].map((option) => (
-                <button
-                  key={option.value}
-                  onClick={() => setFilter(option.value as typeof filter)}
-                  className={cn(
-                    "px-3 py-1.5 rounded-md text-sm font-medium transition-all",
-                    filter === option.value
-                      ? "bg-background shadow text-foreground"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Product Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {filteredProducts.map((product) => (
-              <ProductButton key={product.id} product={product} onAdd={addItemToOrder} />
-            ))}
-          </div>
-        </div>
-
-        {/* Order Summary */}
-        <div className="list-panel border rounded-xl p-6 h-fit sticky top-24">
-          <h3 className="font-semibold text-lg mb-4">Resumo da Venda</h3>
-
-          {orderItems.length === 0 ? (
-            <p className="text-center py-8 text-muted-foreground">
-              Selecione produtos para adicionar
-            </p>
-          ) : (
-            <div className="space-y-3 max-h-[300px] overflow-y-auto mb-4">
-              {orderItems.map((item) => (
-                <OrderItemRow
-                  key={item.productId}
-                  item={item}
-                  onUpdateQuantity={updateItemQuantity}
-                  onRemove={removeItem}
-                />
-              ))}
-            </div>
-          )}
-
-          {/* Total */}
-          <div className="border-t pt-4 mb-4 space-y-2">
-            <div className="flex justify-between text-sm">
-              <span>Subtotal</span>
-              <span>{formatCurrency(total)}</span>
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-sm">Desconto (%)</span>
-              <Input
-                type="number"
-                min="0"
-                max="100"
-                value={discountPercent || ''}
-                onChange={e => setDiscountPercent(Math.min(100, Math.max(0, Number(e.target.value) || 0)))}
-                className="w-24 h-8 text-sm text-right"
+      <div className="flex flex-1 flex-col gap-3 lg:min-h-0 lg:grid lg:grid-cols-[200px_minmax(0,1fr)_380px]">
+        {/* Categorias (desktop) */}
+        <aside className="hidden lg:block min-h-0">
+          <div className="flex h-full flex-col overflow-hidden rounded-xl border bg-card p-2">
+            <div className="flex-1 overflow-y-auto">
+              <CategoryRail
+                categories={categories}
+                selected={category}
+                counts={counts}
+                onSelect={setCategory}
               />
             </div>
-            {discountPercent > 0 && (
-              <div className="flex justify-between text-sm text-green-600">
-                <span>Desconto ({discountPercent}%)</span>
-                <span>-{formatCurrency(discountAmount)}</span>
-              </div>
-            )}
-            <div className="flex justify-between text-xl font-bold pt-2 border-t">
-              <span>Total</span>
-              <span className="text-primary">{formatCurrency(finalTotal)}</span>
-            </div>
           </div>
+        </aside>
 
-          {/* Action Buttons */}
-          {orderItems.length > 0 && (
-            <div className="space-y-2">
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={printPreBill}
-              >
-                <Receipt className="h-4 w-4 mr-2" />
-                Imprimir Conta
-              </Button>
-              <Button
-                variant="gradient"
-                className="w-full"
-                onClick={() => setShowPaymentModal(true)}
-              >
-                <Check className="h-4 w-4 mr-2" />
-                Finalizar Venda
-              </Button>
-            </div>
-          )}
-        </div>
+        {/* Produtos */}
+        <section className="flex min-h-0 flex-1 flex-col gap-2">
+          <div className="lg:hidden">
+            <CategoryRail
+              categories={categories}
+              selected={category}
+              counts={counts}
+              onSelect={setCategory}
+              orientation="horizontal"
+            />
+          </div>
+          <div className="flex-1 min-h-0 overflow-y-auto pb-2 pr-0.5">
+            <ProductGrid
+              products={filteredProducts}
+              loading={loading}
+              searchActive={Boolean(safeSearch)}
+              onAdd={addItemToOrder}
+            />
+          </div>
+        </section>
+
+        {/* Pedido (desktop) */}
+        <aside className="hidden lg:block min-h-0">
+          {completedSale ? renderSuccessPanel() : renderOrderPanel(true)}
+        </aside>
       </div>
 
-      {/* Payment Modal */}
-      <PaymentModal
-        open={showPaymentModal}
-        onClose={() => setShowPaymentModal(false)}
-        totalAmount={finalTotal}
+      {/* Barra móvel */}
+      {!completedSale && orderItems.length > 0 && (
+        <div className="lg:hidden">
+          <Button
+            variant="gradient"
+            size="lg"
+            className="w-full"
+            onClick={() => setOrderSheetOpen(true)}
+          >
+            Ver pedido ({orderItems.length}) · {formatCurrency(total)}
+          </Button>
+        </div>
+      )}
+
+      {/* Pedido em Sheet (mobile/tablet) */}
+      <Sheet open={orderSheetOpen} onOpenChange={setOrderSheetOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-md p-4">
+          <div className="h-full min-h-0">
+            {completedSale ? renderSuccessPanel() : renderOrderPanel(true)}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Vendas suspensas */}
+      <SuspendedListSheet
+        open={suspendedSheetOpen}
+        onOpenChange={setSuspendedSheetOpen}
+        sales={suspendedSales}
+        onResume={handleResumeSuspended}
+        onRemove={handleRemoveSuspended}
+        onNewSale={handleNewSale}
+      />
+
+      {/* Pagamento */}
+      <PaymentDialog
+        open={paymentOpen}
+        onOpenChange={setPaymentOpen}
+        total={total}
+        customer={customer}
+        canCredit={can('creditos')}
+        processing={processing}
         onConfirm={handlePaymentConfirm}
         onCredit={handleCreditConfirm}
       />
 
-      {/* Fraction Dialog (Garrafa/Dose) */}
+      {/* Diálogo Garrafa/Dose */}
       <Dialog open={showFractionDialog} onOpenChange={(open) => { if (!open) { setFractionProduct(null); setBottleQty(0); setShotQty(0); } setShowFractionDialog(open); }}>
         <DialogContent>
           <DialogHeader>
@@ -727,8 +988,6 @@ export default function Sales() {
             <p className="text-sm text-muted-foreground">
               Selecione o tipo e quantidade pretendida
             </p>
-
-            {/* Garrafa */}
             <div className="flex items-center justify-between p-4 border rounded-lg">
               <div>
                 <p className="font-medium">🍾 Garrafa</p>
@@ -737,17 +996,15 @@ export default function Sales() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="icon-sm" onClick={() => setBottleQty(Math.max(0, bottleQty - 1))} aria-label="Diminuir quantidade">
-                  <Minus className="h-3 w-3" />
+                <Button variant="outline" size="icon-sm" onClick={() => setBottleQty(Math.max(0, bottleQty - 1))} aria-label="Diminuir garrafas">
+                  −
                 </Button>
                 <span className="w-8 text-center font-medium">{bottleQty}</span>
-                <Button variant="outline" size="icon-sm" onClick={() => setBottleQty(bottleQty + 1)} aria-label="Aumentar quantidade">
-                  <Plus className="h-3 w-3" />
+                <Button variant="outline" size="icon-sm" onClick={() => setBottleQty(bottleQty + 1)} aria-label="Aumentar garrafas">
+                  +
                 </Button>
               </div>
             </div>
-
-            {/* Dose */}
             {fractionProduct?.precoDose && (
               <div className="flex items-center justify-between p-4 border rounded-lg">
                 <div>
@@ -757,18 +1014,16 @@ export default function Sales() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" size="icon-sm" onClick={() => setShotQty(Math.max(0, shotQty - 1))} aria-label="Diminuir quantidade">
-                    <Minus className="h-3 w-3" />
+                  <Button variant="outline" size="icon-sm" onClick={() => setShotQty(Math.max(0, shotQty - 1))} aria-label="Diminuir doses">
+                    −
                   </Button>
                   <span className="w-8 text-center font-medium">{shotQty}</span>
-                  <Button variant="outline" size="icon-sm" onClick={() => setShotQty(shotQty + 1)} aria-label="Aumentar quantidade">
-                    <Plus className="h-3 w-3" />
+                  <Button variant="outline" size="icon-sm" onClick={() => setShotQty(shotQty + 1)} aria-label="Aumentar doses">
+                    +
                   </Button>
                 </div>
               </div>
             )}
-
-            {/* Summary */}
             <div className="border-t pt-4">
               <div className="flex justify-between text-sm mb-1">
                 <span>Garrafas</span>
@@ -791,13 +1046,13 @@ export default function Sales() {
               Cancelar
             </Button>
             <Button onClick={addFractionItems} disabled={bottleQty <= 0 && shotQty <= 0}>
-              Adicionar ao Carrinho
+              Adicionar ao Pedido
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Custom Price Dialog */}
+      {/* Diálogo de preço personalizado (peso) */}
       <Dialog open={showCustomPriceDialog} onOpenChange={setShowCustomPriceDialog}>
         <DialogContent>
           <DialogHeader>
@@ -823,9 +1078,7 @@ export default function Sales() {
                 placeholder="Ex: 200, 300, 450..."
                 autoFocus
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    addItemWithCustomPrice();
-                  }
+                  if (e.key === 'Enter') addItemWithCustomPrice();
                 }}
               />
               {customPrice && selectedProduct && (
@@ -846,13 +1099,16 @@ export default function Sales() {
         </DialogContent>
       </Dialog>
 
-      {/* Invoice Dialog */}
-      <Dialog open={showInvoiceDialog} onOpenChange={setShowInvoiceDialog}>
+      {/* Diálogo de factura */}
+      <Dialog open={showInvoiceDialog} onOpenChange={(v) => { setShowInvoiceDialog(v); if (!v) setInvoiceError(null); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Emitir Factura</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            {invoiceError && (
+              <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">{invoiceError}</p>
+            )}
             <div className="space-y-2">
               <Label>Tipo de Documento</Label>
               <div className="flex gap-2">
@@ -862,6 +1118,7 @@ export default function Sales() {
                     variant={selectedDocType === type ? 'default' : 'outline'}
                     onClick={() => setSelectedDocType(type)}
                     className="flex-1"
+                    disabled={emittingInvoice}
                   >
                     {type === 'FS' ? 'Simplificada' : type === 'FT' ? 'Factura' : 'Consumidor Final'}
                   </Button>
@@ -871,124 +1128,59 @@ export default function Sales() {
             {selectedDocType === 'FT' && (
               <div className="space-y-2">
                 <Label>Cliente (NUIT obrigatório)</Label>
-                <Input placeholder="Nome do cliente" />
-                <Input placeholder="NUIT" />
+                <Input
+                  placeholder="Nome do cliente"
+                  value={clientName}
+                  onChange={e => setClientName(e.target.value)}
+                  disabled={emittingInvoice}
+                />
+                <Input
+                  placeholder="NUIT"
+                  value={clientNuit}
+                  onChange={e => setClientNuit(e.target.value)}
+                  disabled={emittingInvoice}
+                />
               </div>
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowInvoiceDialog(false)}>Cancelar</Button>
-            <Button onClick={async () => {
-              if (!lastSaleId) return;
-              const result = await issueInvoice(lastSaleId, selectedDocType);
-              if (result.error) return;
-              setShowInvoiceDialog(false);
-              setLastSaleId(null);
+            <Button variant="outline" onClick={() => setShowInvoiceDialog(false)} disabled={emittingInvoice}>Cancelar</Button>
+            <Button disabled={emittingInvoice} onClick={async () => {
+              if (!lastSaleId || emittingInvoice) return;
+              setEmittingInvoice(true);
+              setInvoiceError(null);
+              try {
+                const result = await issueInvoice(
+                  lastSaleId,
+                  selectedDocType,
+                  selectedDocType === 'FT'
+                    ? { name: clientName || undefined, nuit: clientNuit || undefined }
+                    : undefined
+                );
+                if (result.error) {
+                  setInvoiceError(result.error);
+                  return;
+                }
+                setShowInvoiceDialog(false);
+                setLastSaleId(null);
+              } finally {
+                setEmittingInvoice(false);
+              }
             }}>
-              Emitir
+              {emittingInvoice ? 'A emitir...' : 'Emitir'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Invoice Banner */}
-      {lastSaleId && (
-        <div className="fixed bottom-4 right-4 z-50">
-          <Button
-            size="lg"
-            className="shadow-lg"
-            onClick={() => setShowInvoiceDialog(true)}
-          >
-            <FileText className="h-5 w-5 mr-2" /> Emitir Factura
-          </Button>
-        </div>
-      )}
-
     </div>
   );
 }
 
-const ProductButton = memo(({
-  product,
-  onAdd,
-}: {
-  product: Product;
-  onAdd: (product: Product) => void;
-}) => (
-  <button
-    onClick={() => onAdd(product)}
-    disabled={product.stock <= 0}
-    className="p-4 rounded-xl border hover:border-primary hover:shadow-md transition-all text-left group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-border"
-  >
-    {product.image ? (
-      <img
-        src={product.image}
-        alt={product.name}
-        className="h-20 w-full object-cover rounded-lg mb-3"
-      />
-    ) : (
-      <div className="h-20 w-full bg-muted rounded-lg mb-3 flex items-center justify-center">
-        <ShoppingCart className="h-8 w-8 text-muted-foreground" />
-      </div>
-    )}
-    <p className="font-medium text-sm truncate">{product.name}</p>
-    <div className="flex items-center justify-between mt-1">
-      <span className="text-sm text-primary font-semibold">
-        {product.price.toLocaleString('pt-MZ')} MT
-      </span>
-      <Badge
-        variant={product.stock <= 0 ? 'destructive' : product.stock <= 5 ? 'outline' : 'secondary'}
-        className="text-[10px]"
-      >
-        {product.stock <= 0 ? 'Esgotado' : product.stock}
-      </Badge>
-    </div>
-  </button>
-));
-
-const OrderItemRow = memo(({
-  item,
-  onUpdateQuantity,
-  onRemove,
-}: {
-  item: OrderItem;
-  onUpdateQuantity: (productId: string, delta: number) => void;
-  onRemove: (productId: string) => void;
-}) => (
-  <div className="flex items-center justify-between p-2 bg-muted rounded-lg">
-    <div className="flex items-center gap-2">
-      <button
-        onClick={() => onRemove(item.productId)}
-        className="text-destructive hover:bg-destructive/10 p-1 rounded"
-        aria-label="Remover item"
-      >
-        <X className="h-4 w-4" />
-      </button>
-      <div className="min-w-0">
-        <p className="font-medium text-sm truncate">{item.product?.name ?? 'Produto'}</p>
-        <p className="text-xs text-muted-foreground">{item.product?.price ?? 0} MT</p>
-      </div>
-    </div>
-    <div className="flex items-center gap-1">
-      <Button
-        variant="outline"
-        size="icon-sm"
-        onClick={() => onUpdateQuantity(item.productId, -1)}
-        className="h-6 w-6"
-        aria-label="Diminuir quantidade"
-      >
-        <Minus className="h-3 w-3" />
-      </Button>
-      <span className="w-6 text-center text-sm font-medium">{item.quantity}</span>
-      <Button
-        variant="outline"
-        size="icon-sm"
-        onClick={() => onUpdateQuantity(item.productId, 1)}
-        className="h-6 w-6"
-        aria-label="Aumentar quantidade"
-      >
-        <Plus className="h-3 w-3" />
-      </Button>
-    </div>
-  </div>
-));
+function buildMethodLabel(payment: PaymentConfirm): string {
+  const parts: string[] = [];
+  if (payment.cash > 0) parts.push('Dinheiro');
+  if (payment.mpesa > 0) parts.push('M-Pesa');
+  if (payment.emola > 0) parts.push('E-Mola');
+  if (payment.card > 0) parts.push('Cartão');
+  return parts.length > 0 ? parts.join(' + ') : 'Pagamento';
+}

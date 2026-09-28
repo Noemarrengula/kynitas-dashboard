@@ -28,7 +28,7 @@ export default function Credits() {
     );
   }, [customers, search]);
 
-  const totalDebt = customers.reduce((sum, c) => sum + c.current_balance, 0);
+  const totalDebt = customers.reduce((sum, c) => sum + c.currentBalance, 0);
   const activeCustomers = customers.filter(c => c.status === 'active').length;
   const blockedCustomers = customers.filter(c => c.status === 'blocked').length;
 
@@ -55,9 +55,9 @@ export default function Credits() {
     setPaymentModalOpen(true);
   };
 
-  const handleSavePayment = useCallback(async (amount: number, method: string, description?: string) => {
+  const handleSavePayment = useCallback(async (amount: number, method: string, description?: string, reference?: string) => {
     if (!selectedCustomer) return { success: false };
-    return await registerPayment(selectedCustomer.id, amount, method, description);
+    return await registerPayment(selectedCustomer.id, amount, method, description, reference);
   }, [selectedCustomer, registerPayment]);
 
   if (loading) {
@@ -153,7 +153,7 @@ export default function Credits() {
           </div>
         ) : (
           filteredCustomers.map((customer) => {
-          const usagePercent = (customer.current_balance / customer.credit_limit) * 100;
+          const usagePercent = (customer.currentBalance / customer.creditLimit) * 100;
           const isNearLimit = usagePercent >= 80;
           const isBlocked = customer.status === 'blocked';
 
@@ -176,17 +176,17 @@ export default function Credits() {
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Dívida Atual</span>
                     <span className="font-semibold text-destructive">
-                      {formatCurrency(customer.current_balance)}
+                      {formatCurrency(customer.currentBalance)}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Limite</span>
-                    <span className="font-medium">{formatCurrency(customer.credit_limit)}</span>
+                    <span className="font-medium">{formatCurrency(customer.creditLimit)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Disponível</span>
                     <span className="font-medium text-success">
-                      {formatCurrency(customer.credit_limit - customer.current_balance)}
+                      {formatCurrency(customer.creditLimit - customer.currentBalance)}
                     </span>
                   </div>
                 </div>
@@ -223,7 +223,7 @@ export default function Credits() {
                     variant="default" 
                     className="flex-1"
                     onClick={() => handlePayment(customer)}
-                    disabled={customer.current_balance === 0}
+                    disabled={customer.currentBalance === 0}
                   >
                     Receber
                   </Button>

@@ -13,8 +13,11 @@ import { useBusiness } from '@/contexts/BusinessContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions, ROLE_LABELS } from '@/hooks/usePermissions';
 import { supabase } from '@/lib/supabase';
+import { deactivateBusinessUser } from '@/lib/supabase-admin';
+import { VisaoGlobal } from '@/components/admin/VisaoGlobal';
 import { useToast } from '@/hooks/use-toast';
 import { getErrorMessage } from '@/lib/utils';
+import type { BusinessRole } from '@/types/domains/user';
 
 interface BusinessStats {
   id: string;
@@ -31,9 +34,10 @@ interface BusinessStats {
 
 interface BusinessUser {
   id: string;
+  business_id: string;
   name: string;
   email: string;
-  role: string;
+  role: BusinessRole;
   active: boolean;
   business_name: string;
   created_at: string;
@@ -42,7 +46,7 @@ interface BusinessUser {
 export function CentralAdminPanel() {
   const { currentBusinessUser } = useBusiness();
   const { user } = useAuth();
-  const { isAdmin } = usePermissions();
+  const { isSuperAdmin } = usePermissions();
   const { toast } = useToast();
   
   const [businessStats, setBusinessStats] = useState<BusinessStats[]>([]);
@@ -51,11 +55,11 @@ export function CentralAdminPanel() {
   const [selectedBusiness, setSelectedBusiness] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isAdmin) {
+    if (isSuperAdmin) {
       loadBusinessStats();
       loadAllUsers();
     }
-  }, [isAdmin]);
+  }, [isSuperAdmin]);
 
   const loadBusinessStats = async () => {
     try {
@@ -130,6 +134,7 @@ export function CentralAdminPanel() {
         .from('business_users')
         .select(`
           id,
+          business_id,
           role,
           active,
           created_at,
@@ -141,6 +146,7 @@ export function CentralAdminPanel() {
 
       const users: BusinessUser[] = data?.map((item: any) => ({
         id: item.id,
+        business_id: item.business_id,
         name: item.auth?.users?.raw_user_meta_data?.name || 'Sem nome',
         email: item.auth?.users?.email || '',
         role: item.role,
@@ -186,14 +192,17 @@ export function CentralAdminPanel() {
     }
   };
 
-  const toggleUserStatus = async (userId: string, active: boolean) => {
+  const toggleUserStatus = async (userId: string, businessId: string, active: boolean) => {
     try {
-      const { error } = await supabase
-        .from('business_users')
-        .update({ active })
-        .eq('id', userId);
-
-      if (error) throw error;
+      if (active) {
+        const { error } = await supabase
+          .from('business_users')
+          .update({ active: true })
+          .eq('id', userId);
+        if (error) throw error;
+      } else {
+        await deactivateBusinessUser(userId, businessId);
+      }
 
       toast({
         title: active ? "Usuário ativado" : "Usuário desativado",
@@ -210,12 +219,12 @@ export function CentralAdminPanel() {
     }
   };
 
-  if (!isAdmin) {
+  if (!isSuperAdmin) {
     return (
       <Alert>
         <Crown className="h-4 w-4" />
         <AlertDescription>
-          Acesso restrito a Administradores. Você precisa de permissões de administrador para acessar esta área.
+          Acesso restrito a Super Administradores. Esta área central agrega todos os estabelecimentos e só o administrador de topo pode aceder.
         </AlertDescription>
       </Alert>
     );
@@ -310,13 +319,17 @@ export function CentralAdminPanel() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="businesses" className="space-y-4">
+      <Tabs defaultValue="visaoGlobal" className="space-y-4">
         <TabsList>
+          <TabsTrigger value="visaoGlobal">Visão Global</TabsTrigger>
           <TabsTrigger value="businesses">Estabelecimentos</TabsTrigger>
           <TabsTrigger value="users">Usuários</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
           <TabsTrigger value="settings">Configurações</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="visaoGlobal" className="space-y-4">
+          <VisaoGlobal />
+        </TabsContent>
 
         <TabsContent value="businesses" className="space-y-4">
           <Card>
@@ -416,10 +429,13 @@ export function CentralAdminPanel() {
                       <TableCell>{user.email}</TableCell>
                       <TableCell>{user.business_name}</TableCell>
                       <TableCell>
-                        <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
-  {user.role === 'admin' && <Crown className="h-3 w-3 mr-1" />}
-  {ROLE_LABELS[user.role as 'admin' | 'supervisor' | 'caixa'] || user.role}
-</Badge>
+                        <Badge
+                          variant={user.role === 'admin' || user.role === 'super_admin' ? 'default' : 'secondary'}
+                          className={user.role === 'super_admin' ? 'border-yellow-500/40 bg-yellow-500/10 text-yellow-600' : undefined}
+                        >
+                          {user.role === 'super_admin' && <Crown className="h-3 w-3 mr-1" />}
+                          {ROLE_LABELS[user.role as BusinessRole] || user.role}
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         <Badge variant={user.active ? 'default' : 'secondary'}>
@@ -437,8 +453,8 @@ export function CentralAdminPanel() {
                           <Button
                             size="sm"
                             variant={user.active ? "destructive" : "default"}
-                            onClick={() => toggleUserStatus(user.id, !user.active)}
-                            disabled={user.role === 'admin'}
+                            onClick={() => toggleUserStatus(user.id, user.business_id, !user.active)}
+                            disabled={user.role === 'super_admin' && !isSuperAdmin}
                           >
                             {user.active ? 'Desativar' : 'Ativar'}
                           </Button>
@@ -448,19 +464,6 @@ export function CentralAdminPanel() {
                   ))}
                 </TableBody>
               </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="analytics" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Analytics Consolidados</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">
-                Relatórios e análises consolidadas de todos os estabelecimentos serão implementados aqui.
-              </p>
             </CardContent>
           </Card>
         </TabsContent>

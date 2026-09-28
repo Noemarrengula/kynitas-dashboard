@@ -27,7 +27,7 @@ export interface StockMovement {
   id: string;
   productId?: string;
   ingredientId?: string;
-  type: 'entry' | 'exit';
+  type: 'entry' | 'exit' | 'sale';
   quantity: number;
   reason: string;
   createdAt: Date;

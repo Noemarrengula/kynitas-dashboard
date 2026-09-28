@@ -22,12 +22,22 @@ import {
   Target,
   HardDrive,
   ClipboardList,
+  HeartPulse,
   ChefHat,
   Wallet,
   ArrowLeftRight,
   HandCoins,
   CreditCard,
   Percent,
+  Boxes,
+  BookOpen,
+  Truck,
+  ReceiptText,
+  PackageCheck,
+  PackageX,
+  BrainCircuit,
+  Landmark,
+  Crown,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -48,6 +58,7 @@ interface NavItem {
   labelKey: string;
   path: string;
   feature: Feature;
+  exact?: boolean;
 }
 
 interface NavSection {
@@ -80,11 +91,23 @@ const navSections: NavSection[] = [
     sectionKey: 'inventory',
     labelKey: 'nav.section.inventory',
     items: [
+      { icon: Warehouse, labelKey: 'nav.inventoryOverview', path: '/inventory', feature: 'inventario_visualizar', exact: true },
       { icon: Wine, labelKey: 'nav.drinks', path: '/products/drinks', feature: 'produtos_visualizar' },
       { icon: UtensilsCrossed, labelKey: 'nav.meals', path: '/products/meals', feature: 'produtos_visualizar' },
       { icon: Package, labelKey: 'nav.stock', path: '/stock', feature: 'inventario_visualizar' },
+      { icon: Boxes, labelKey: 'nav.ingredients', path: '/inventory/ingredients', feature: 'inventario_visualizar' },
+      { icon: BookOpen, labelKey: 'nav.recipes', path: '/inventory/recipes', feature: 'inventario_visualizar' },
       { icon: ArrowLeftRight, labelKey: 'nav.movements', path: '/stock/movements', feature: 'inventario_visualizar' },
-      { icon: Warehouse, labelKey: 'nav.inventory', path: '/inventory', feature: 'inventario_visualizar' },
+    ],
+  },
+  {
+    sectionKey: 'procurement',
+    labelKey: 'nav.section.procurement',
+    items: [
+      { icon: Truck, labelKey: 'nav.suppliers', path: '/fornecedores', feature: 'inventario_visualizar', exact: true },
+      { icon: ReceiptText, labelKey: 'nav.purchases', path: '/compras', feature: 'inventario_visualizar', exact: true },
+      { icon: PackageCheck, labelKey: 'nav.receipts', path: '/rececoes', feature: 'inventario_visualizar' },
+      { icon: PackageX, labelKey: 'nav.losses', path: '/perdas', feature: 'inventario_visualizar' },
     ],
   },
   {
@@ -92,6 +115,7 @@ const navSections: NavSection[] = [
     labelKey: 'nav.section.customers',
     items: [
       { icon: Users, labelKey: 'nav.customers', path: '/customers', feature: 'clientes' },
+      { icon: Landmark, labelKey: 'nav.collections', path: '/cobrancas', feature: 'cobrancas' },
       { icon: HandCoins, labelKey: 'nav.credits', path: '/credits-vendas', feature: 'creditos' },
       { icon: CreditCard, labelKey: 'nav.creditsManagment', path: '/credits', feature: 'creditos' },
     ],
@@ -110,6 +134,7 @@ const navSections: NavSection[] = [
     sectionKey: 'intelligence',
     labelKey: 'nav.section.intelligence',
     items: [
+      { icon: BrainCircuit, labelKey: 'nav.bi', path: '/bi', feature: 'relatorios' },
       { icon: TrendingUp, labelKey: 'nav.executive', path: '/executive', feature: 'relatorios' },
       { icon: BarChart3, labelKey: 'nav.reports', path: '/reports', feature: 'relatorios' },
     ],
@@ -122,7 +147,9 @@ const navSections: NavSection[] = [
       { icon: Shield, labelKey: 'nav.users', path: '/settings/users', feature: 'gestao_utilizadores' },
       { icon: HardDrive, labelKey: 'nav.backup', path: '/backup', feature: 'backup' },
       { icon: ClipboardList, labelKey: 'nav.audit', path: '/audit', feature: 'auditoria' },
+      { icon: HeartPulse, labelKey: 'nav.systemHealth', path: '/health', feature: 'configuracoes' },
       { icon: Settings, labelKey: 'nav.settings', path: '/settings', feature: 'configuracoes' },
+      { icon: Crown, labelKey: 'nav.administracao', path: '/administracao', feature: 'administracao' },
     ],
   },
 ];
@@ -209,9 +236,10 @@ export function Sidebar() {
             <nav className="flex-1 overflow-y-auto custom-scrollbar px-2 py-3 space-y-4">
               {visibleSections.map((section) => {
                 const sectionItems = section.items.map((item) => {
-                  const isActive =
-                    location.pathname === item.path ||
-                    location.pathname.startsWith(item.path + "/");
+                  const isActive = item.exact
+                    ? location.pathname === item.path
+                    : location.pathname === item.path ||
+                      location.pathname.startsWith(item.path + "/");
 
                   const link = (
                     <NavLink

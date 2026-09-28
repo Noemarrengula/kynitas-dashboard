@@ -24,17 +24,20 @@ import {
 } from '@/lib/supabase-admin';
 import type { BusinessRole, BusinessUser } from '@/types/domains/user';
 
-const ROLE_OPTIONS: { value: BusinessRole; label: string }[] = [
+const ALL_ROLE_OPTIONS: { value: BusinessRole; label: string }[] = [
   { value: 'admin', label: 'Administrador' },
   { value: 'supervisor', label: 'Supervisor' },
   { value: 'caixa', label: 'Caixa' },
+  { value: 'super_admin', label: 'Super Admin' },
 ];
 
 export default function UsersPage() {
   const { currentBusiness, businesses } = useBusiness();
   const { user: authUser } = useAuth();
-  const { can, role } = usePermissions();
+  const { can, role, isSuperAdmin } = usePermissions();
   const isAdmin = can('gestao_utilizadores');
+  const roleOptions = isSuperAdmin ? ALL_ROLE_OPTIONS : ALL_ROLE_OPTIONS.filter(o => o.value !== 'super_admin');
+  const canTouch = (targetRole: BusinessRole) => isSuperAdmin || targetRole !== 'super_admin';
   const [users, setUsers] = useState<BusinessUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -208,7 +211,7 @@ export default function UsersPage() {
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {ROLE_OPTIONS.map((opt) => (
+                                  {roleOptions.map((opt) => (
                                     <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                                   ))}
                                 </SelectContent>
@@ -246,7 +249,7 @@ export default function UsersPage() {
                             <Button
                               variant="outline"
                               size="sm"
-                              disabled={isSelf}
+                              disabled={isSelf || !canTouch(u.role)}
                               onClick={() => {
                                 setEditingRole({ userId: u.user_id, businessId: u.business_id });
                                 setEditRoleValue(u.role);
@@ -258,7 +261,7 @@ export default function UsersPage() {
                               <Button
                                 variant="destructive"
                                 size="sm"
-                                disabled={isSelf}
+                                disabled={isSelf || !canTouch(u.role)}
                                 onClick={() => handleDeactivate(u.user_id, u.business_id)}
                               >
                                 <Ban className="h-3 w-3 mr-1" /> Remover acesso
@@ -342,7 +345,7 @@ export default function UsersPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {ROLE_OPTIONS.map((opt) => (
+                  {roleOptions.map((opt) => (
                     <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                   ))}
                 </SelectContent>

@@ -38,8 +38,8 @@ export function useAlerts() {
 
     // 2. Alerta de clientes próximos do limite de crédito (80%)
     const highCreditCustomers = customers.filter(c => {
-      if (c.credit_limit === 0) return false;
-      const usage = (c.current_balance / c.credit_limit) * 100;
+      if (c.creditLimit === 0) return false;
+      const usage = (c.currentBalance / c.creditLimit) * 100;
       return usage >= 80 && usage < 100;
     });
     if (highCreditCustomers.length > 0) {
@@ -56,8 +56,8 @@ export function useAlerts() {
 
     // 3. Alerta de clientes que excederam o limite
     const exceededCreditCustomers = customers.filter(c => {
-      if (c.credit_limit === 0) return false;
-      return c.current_balance > c.credit_limit;
+      if (c.creditLimit === 0) return false;
+      return c.currentBalance > c.creditLimit;
     });
     if (exceededCreditCustomers.length > 0) {
       alertList.push({

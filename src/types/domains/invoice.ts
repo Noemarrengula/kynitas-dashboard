@@ -15,6 +15,7 @@ export interface Invoice {
   id: string;
   businessId: string;
   saleId?: string;
+  originalInvoiceId?: string;
   documentType: DocumentType;
   series: string;
   number: number;

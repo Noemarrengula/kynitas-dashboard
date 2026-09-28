@@ -83,6 +83,7 @@ export function Topbar() {
       case 'admin': return 'destructive' as const;
       case 'supervisor': return 'secondary' as const;
       case 'caixa': return 'outline' as const;
+      case 'super_admin': return 'default' as const;
       default: return 'outline' as const;
     }
   };

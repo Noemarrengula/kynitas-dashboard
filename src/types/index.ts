@@ -4,6 +4,7 @@ export * from './domains/credit';
 export * from './domains/transaction';
 export * from './domains/user';
 export * from './domains/invoice';
+export * from './domains/purchase';
 
 export interface DashboardMetrics {
   totalSales: number;
@@ -86,65 +87,6 @@ export interface Database {
       };
     };
   };
-}
-
-export interface Supplier {
-  id: string;
-  business_id: string;
-  name: string;
-  contact_person?: string;
-  email?: string;
-  phone?: string;
-  address?: string;
-  nuit?: string;
-  payment_terms: number;
-  credit_limit: number;
-  notes?: string;
-  active: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface PurchaseOrder {
-  id: string;
-  business_id: string;
-  supplier_id: string;
-  order_number: string;
-  order_date: string;
-  expected_delivery?: string;
-  status: 'draft' | 'sent' | 'confirmed' | 'received' | 'cancelled';
-  items: Array<{
-    ingredient_id: string;
-    ingredient_name: string;
-    quantity: number;
-    unit_price: number;
-    total: number;
-  }>;
-  subtotal: number;
-  tax: number;
-  total: number;
-  notes?: string;
-  created_by?: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface PurchaseReceipt {
-  id: string;
-  business_id: string;
-  purchase_order_id?: string;
-  supplier_id: string;
-  receipt_date: string;
-  items: Array<{
-    ingredient_id: string;
-    ingredient_name: string;
-    quantity: number;
-  }>;
-  total: number;
-  invoice_number?: string;
-  notes?: string;
-  created_by?: string;
-  created_at: string;
 }
 
 export interface Ingredient {

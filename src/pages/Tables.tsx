@@ -1,9 +1,24 @@
-import { useState, useCallback, memo } from 'react';
-import { Users, Minus, X, Check, Settings2, PlusCircle, Receipt } from 'lucide-react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Users,
+  Check,
+  Settings2,
+  PlusCircle,
+  Receipt,
+  Armchair,
+  Clock,
+  CheckCircle2,
+  CircleDot,
+  ChevronRight,
+  HandCoins,
+  Square,
+} from 'lucide-react';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useI18n } from '@/contexts/I18nContext';
 import { PaymentModal } from '@/components/sales/PaymentModal';
 import { useDatabase } from '@/hooks/useDatabase';
+import { useAuditLog } from '@/hooks/useAuditLog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -11,62 +26,109 @@ import { Label } from '@/components/ui/label';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useStore } from '@/store/useStore';
-import { Table, Order, OrderItem, Product } from '@/types';
+import { Table, Order } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/hooks/use-toast';
-import { cn, getErrorMessage } from '@/lib/utils';
+import { cn, getErrorMessage, formatCurrency } from '@/lib/utils';
 import { TableManagementModal } from '@/components/tables/TableManagementModal';
 import { NewTableModal } from '@/components/tables/NewTableModal';
 import { useTablesPersistence } from '@/hooks/useTablesPersistence';
 import { useCredits } from '@/hooks/useCredits';
-import { printReceipt } from '@/lib/receipt';
+import { printReceipt, printPreBill } from '@/lib/receipt';
 
-const statusLabels = {
-  free: 'Livre',
-  occupied: 'Ocupada',
-  awaiting_payment: 'Aguardando Pagamento',
+const STATUS_META: Record<Table['status'], { label: string; dot: string; accent: string; badge: string }> = {
+  free: {
+    label: 'Livre',
+    dot: 'bg-success',
+    accent: 'border-success/30',
+    badge: 'bg-success/10 text-success border-success/20',
+  },
+  occupied: {
+    label: 'Ocupada',
+    dot: 'bg-warning',
+    accent: 'border-warning/40',
+    badge: 'bg-warning/10 text-warning border-warning/20',
+  },
+  awaiting_payment: {
+    label: 'Aguardando pagamento',
+    dot: 'bg-blue-500',
+    accent: 'border-blue-500/40',
+    badge: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30',
+  },
 };
 
-const statusColors = {
-  free: 'bg-success/10 text-success border-success/20',
-  occupied: 'bg-primary/10 text-primary border-primary/20',
-  awaiting_payment: 'bg-warning/10 text-warning border-warning/20',
-};
+const STATUS_FILTERS: { key: 'all' | Table['status']; label: string }[] = [
+  { key: 'all', label: 'Todas' },
+  { key: 'free', label: 'Livres' },
+  { key: 'occupied', label: 'Ocupadas' },
+  { key: 'awaiting_payment', label: 'Aguardando pagamento' },
+];
+
+function formatElapsed(start: Date | undefined, now: number): string {
+  if (!start) return '—';
+  const ms = now - start.getTime();
+  if (!Number.isFinite(ms) || ms < 0) return '—';
+  const minutes = Math.floor(ms / 60000);
+  if (minutes < 60) return `${minutes} min`;
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}min`;
+}
 
 export default function Tables() {
-  const { tables, orders, setTables } = useStore();
+  const { tables, orders } = useStore();
   const { products, ingredients, addSale } = useDatabase();
   const { business } = useBusiness();
-  const { addTable, updateTable, addOrder, updateOrder } = useTablesPersistence();
+  const { addTable, updateTable, updateOrder } = useTablesPersistence();
   const { registerCreditCharge } = useCredits();
+  const { log: auditLog } = useAuditLog();
   const { t } = useI18n();
+  const navigate = useNavigate();
+
+  const [statusFilter, setStatusFilter] = useState<'all' | Table['status']>('all');
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
-  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showManagementModal, setShowManagementModal] = useState(false);
   const [showNewTableModal, setShowNewTableModal] = useState(false);
   const [managingTable, setManagingTable] = useState<Table | null>(null);
   const [showCreditDialog, setShowCreditDialog] = useState(false);
   const [creditCustomerName, setCreditCustomerName] = useState('');
+  const [closeConfirm, setCloseConfirm] = useState(false);
 
+  // Actualizar o tempo de ocupação a cada 30s (sem redesenhar a página inteira)
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(id);
+  }, []);
 
-  const handleTableClick = useCallback((table: Table, e: React.MouseEvent) => {
+  const selectedOrder = useMemo(() => {
+    if (!selectedTable?.currentOrderId) return undefined;
+    return orders.find(o => o.id === selectedTable.currentOrderId);
+  }, [selectedTable, orders]);
+
+  const filteredTables = useMemo(() => {
+    if (statusFilter === 'all') return tables;
+    return tables.filter(t => t.status === statusFilter);
+  }, [tables, statusFilter]);
+
+  const allFree = tables.length > 0 && tables.every(t => t.status === 'free');
+
+  const orderOf = useCallback((table: Table) => {
+    if (!table.currentOrderId) return undefined;
+    return orders.find(o => o.id === table.currentOrderId);
+  }, [orders]);
+
+  const openTableDialog = useCallback((table: Table, e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('.manage-btn')) return;
     setSelectedTable(table);
-    
-    if (table.currentOrderId) {
-      const order = orders.find(o => o.id === table.currentOrderId);
-      if (order) {
-        setOrderItems([...order.items]);
-      }
-    } else {
-      setOrderItems([]);
-    }
-  }, [orders]);
+  }, []);
 
   const handleManageTable = useCallback((table: Table) => {
     setManagingTable(table);
@@ -97,79 +159,45 @@ export default function Tables() {
     toast({ title: 'Mesa criada!' });
   }, [addTable]);
 
-  const addItemToOrder = (product: Product) => {
-    const existingItem = orderItems.find(i => i.productId === product.id);
-    
-    if (existingItem) {
-      setOrderItems(orderItems.map(i =>
-        i.productId === product.id
-          ? { ...i, quantity: i.quantity + 1, subtotal: (i.quantity + 1) * product.price }
-          : i
-      ));
-    } else {
-      setOrderItems([
-        ...orderItems,
-        { productId: product.id, product, quantity: 1, subtotal: product.price }
-      ]);
+  const goToPos = useCallback((table: Table) => {
+    navigate(`/sales?mesa=${encodeURIComponent(table.id)}`);
+  }, [navigate]);
+
+  const printPreBillForOrder = useCallback(() => {
+    if (!selectedTable || !selectedOrder || selectedOrder.items.length === 0) {
+      toast({
+        title: 'Pedido vazio',
+        description: 'Não existem itens na mesa para imprimir.',
+        variant: 'destructive',
+      });
+      return;
     }
-  };
-
-  const updateItemQuantity = (productId: string, delta: number) => {
-    const item = orderItems.find(i => i.productId === productId);
-    if (!item) return;
-
-    const newQuantity = item.quantity + delta;
-    if (newQuantity <= 0) {
-      setOrderItems(orderItems.filter(i => i.productId !== productId));
-    } else {
-      setOrderItems(orderItems.map(i =>
-        i.productId === productId
-          ? { ...i, quantity: newQuantity, subtotal: newQuantity * (i.product?.price ?? 0) }
-          : i
-      ));
+    try {
+      printPreBill(
+        selectedOrder.items,
+        selectedTable.name || `Mesa ${selectedTable.number}`,
+        business
+      );
+    } catch (error) {
+      console.error('Erro ao imprimir pré-conta:', error);
+      toast({
+        title: 'Erro ao imprimir',
+        description: 'Tente novamente',
+        variant: 'destructive',
+      });
     }
-  };
-
-  const removeItem = (productId: string) => {
-    setOrderItems(orderItems.filter(i => i.productId !== productId));
-  };
-
-  const total = orderItems.reduce((acc, item) => acc + item.subtotal, 0);
-
-  const handleSaveOrder = useCallback(() => {
-    if (!selectedTable || orderItems.length === 0) return;
-
-    const orderId = selectedTable.currentOrderId || `order-${Date.now()}`;
-    
-    if (selectedTable.currentOrderId) {
-      updateOrder(orderId, { items: orderItems, total });
-    } else {
-      const newOrder: Order = {
-        id: orderId,
-        tableId: selectedTable.id,
-        items: orderItems,
-        status: 'preparing',
-        total,
-        createdAt: new Date(),
-      };
-      addOrder(newOrder);
-      updateTable(selectedTable.id, { status: 'occupied', currentOrderId: orderId });
-    }
-
-    toast({ title: 'Pedido guardado!' });
-    setSelectedTable(null);
-  }, [selectedTable, orderItems, total, updateOrder, addOrder, updateTable]);
+  }, [selectedTable, selectedOrder, business]);
 
   const handlePaymentConfirm = useCallback(async (payment: { cash: number; mpesa: number; emola: number; card: number; customerId?: string }) => {
-    if (!selectedTable) return;
+    if (!selectedTable || !selectedOrder) return;
 
     try {
       const totalReceived = payment.cash + payment.mpesa + payment.emola + payment.card;
-      const change = totalReceived - total;
+      const change = totalReceived - selectedOrder.total;
 
       const saleData = {
-        items: orderItems,
-        total,
+        items: selectedOrder.items,
+        total: selectedOrder.total,
         paymentDetails: {
           cash: payment.cash,
           mpesa: payment.mpesa,
@@ -190,7 +218,7 @@ export default function Tables() {
       if (saleResult.error) throw saleResult.error;
 
       if (selectedTable.currentOrderId) {
-        updateOrder(selectedTable.currentOrderId, { status: 'paid' });
+        await updateOrder(selectedTable.currentOrderId, { status: 'paid' });
       }
 
       try {
@@ -203,43 +231,42 @@ export default function Tables() {
           status: 'closed',
           opened_at: selectedTable.opened_at?.toISOString(),
           closed_at: new Date().toISOString(),
-          total_amount: total,
+          total_amount: selectedOrder.total,
           sale_id: saleResult.data?.id,
         });
       } catch (histErr) {
         console.warn('Erro ao arquivar histórico da mesa:', histErr);
       }
 
-      const updatedTables = tables.map(t => t.id === selectedTable.id
+      auditLog('table_close', 'tables', selectedTable.id, { payment: true, total: selectedOrder.total });
+      useStore.getState().setTables(tables.map(t => t.id === selectedTable.id
         ? { ...t, status: 'free' as const, currentOrderId: undefined, customer_name: undefined, closed_at: new Date() }
-        : t);
-      setTables(updatedTables);
+        : t));
       setShowPaymentModal(false);
       setSelectedTable(null);
-      setOrderItems([]);
 
-    // Check for low stock
-    const lowStockItems = orderItems.filter(item => {
-      const product = products.find(p => p.id === item.productId);
-      return product && (product.stock - item.quantity) <= 5;
-    });
+      // Check for low stock
+      const lowStockItems = selectedOrder.items.filter(item => {
+        const product = products.find(p => p.id === item.productId);
+        return product && (product.stock - item.quantity) <= 5;
+      });
 
-    // Check for low ingredients
-    const lowIngredients: string[] = [];
-    orderItems.forEach(item => {
-      const product = products.find(p => p.id === item.productId);
-      if (product?.recipe) {
-        product.recipe.forEach(recipeItem => {
-          const ingredient = ingredients.find(i => i.id === recipeItem.ingredientId);
-          if (ingredient) {
-            const newStock = ingredient.stock - (recipeItem.quantity * item.quantity);
-            if (newStock <= ingredient.minStock && !lowIngredients.includes(ingredient.name)) {
-              lowIngredients.push(ingredient.name);
+      // Check for low ingredients
+      const lowIngredients: string[] = [];
+      selectedOrder.items.forEach(item => {
+        const product = products.find(p => p.id === item.productId);
+        if (product?.recipe) {
+          product.recipe.forEach(recipeItem => {
+            const ingredient = ingredients.find(i => i.id === recipeItem.ingredientId);
+            if (ingredient) {
+              const newStock = ingredient.stock - (recipeItem.quantity * item.quantity);
+              if (newStock <= ingredient.minStock && !lowIngredients.includes(ingredient.name)) {
+                lowIngredients.push(ingredient.name);
+              }
             }
-          }
-        });
-      }
-    });
+          });
+        }
+      });
 
       toast({
         title: 'Pagamento realizado com sucesso!',
@@ -250,16 +277,16 @@ export default function Tables() {
       printReceipt(saleData, 'merchant', business);
 
       if (lowStockItems.length > 0 || lowIngredients.length > 0) {
-      setTimeout(() => {
-        const messages = [];
-        if (lowStockItems.length > 0) messages.push(`${lowStockItems.length} produto(s)`);
-        if (lowIngredients.length > 0) messages.push(`${lowIngredients.length} ingrediente(s)`);
-        toast({
-          title: 'Alerta de Stock!',
-          description: `${messages.join(' e ')} com stock crítico`,
-          variant: 'destructive',
-        });
-      }, 1000);
+        setTimeout(() => {
+          const messages = [];
+          if (lowStockItems.length > 0) messages.push(`${lowStockItems.length} produto(s)`);
+          if (lowIngredients.length > 0) messages.push(`${lowIngredients.length} ingrediente(s)`);
+          toast({
+            title: 'Alerta de Stock!',
+            description: `${messages.join(' e ')} com stock crítico`,
+            variant: 'destructive',
+          });
+        }, 1000);
       }
     } catch (error) {
       console.error('Erro ao processar pagamento:', error);
@@ -269,150 +296,10 @@ export default function Tables() {
         variant: 'destructive',
       });
     }
-  }, [selectedTable, total, orderItems, tables, products, ingredients, addSale, business, updateOrder, setTables]);
-
-  const printPreBill = useCallback(() => {
-    if (orderItems.length === 0) {
-      toast({
-        title: 'Pedido vazio',
-        description: 'Adicione itens antes de imprimir a conta',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    try {
-      const iframe = document.createElement('iframe');
-      iframe.style.position = 'absolute';
-      iframe.style.width = '0';
-      iframe.style.height = '0';
-      iframe.style.border = 'none';
-      document.body.appendChild(iframe);
-      
-      const doc = iframe.contentWindow?.document;
-      if (!doc) return;
-      
-      doc.open();
-      doc.write(generatePreBillHTML());
-      doc.close();
-      
-      setTimeout(() => {
-        iframe.contentWindow?.focus();
-        iframe.contentWindow?.print();
-        setTimeout(() => {
-          if (document.body.contains(iframe)) {
-            document.body.removeChild(iframe);
-          }
-        }, 1000);
-      }, 100);
-    } catch (error) {
-      console.error('Erro ao imprimir:', error);
-    }
-  }, [orderItems, generatePreBillHTML]);
-
-  function generatePreBillHTML() {
-    const formatCurrency = (value: number) => `${value.toFixed(2)} MT`;
-    const centerText = (text: string, width = 48) => {
-      const padding = Math.max(0, Math.floor((width - text.length) / 2));
-      return ' '.repeat(padding) + text;
-    };
-    const line = (char: string, width = 48) => char.repeat(width);
-    const formatLine = (left: string, right: string, width = 48) => {
-      const spaces = width - left.length - right.length;
-      return left + ' '.repeat(Math.max(1, spaces)) + right;
-    };
-
-    const bill = [];
-    bill.push(centerText(business?.name || 'KYNITAS BAR'));
-    bill.push(centerText('Bar & Restaurante'));
-    if (business?.address) bill.push(centerText(business.address));
-    if (business?.phone) bill.push(centerText('Tel: ' + business.phone));
-    bill.push('');
-    bill.push(line('='));
-    bill.push('');
-    bill.push(centerText('*** PRE-CONTA ***'));
-    bill.push('');
-    if (selectedTable) {
-      bill.push('Mesa: ' + (selectedTable.name || `Mesa ${selectedTable.number}`));
-      if (selectedTable.customer_name) {
-        bill.push('Cliente: ' + selectedTable.customer_name);
-      }
-    }
-    bill.push('Data: ' + new Date().toLocaleString('pt-MZ'));
-    bill.push('');
-    bill.push(line('-'));
-    bill.push('');
-    bill.push('ITENS:');
-    bill.push('');
-    
-    orderItems.forEach((item) => {
-      bill.push(item.product?.name ?? 'Produto');
-      bill.push(formatLine(`  ${item.quantity}x ${formatCurrency(item.product?.price ?? 0)}`, formatCurrency(item.subtotal)));
-    });
-    
-    bill.push('');
-    bill.push(line('-'));
-    bill.push('');
-    bill.push(formatLine('TOTAL A PAGAR:', formatCurrency(total)));
-    bill.push('');
-    bill.push(line('='));
-    bill.push('');
-    bill.push(centerText('METODOS DE PAGAMENTO'));
-    bill.push('');
-    bill.push('M-Pesa (Levantamento):');
-    bill.push(centerText('414162'));
-    bill.push('');
-    bill.push('E-Mola (Levantamento):');
-    bill.push(centerText('98580'));
-    bill.push('');
-    bill.push('Cartao (P.O.S):');
-    bill.push(centerText('Disponivel'));
-    bill.push('');
-    bill.push('Numerario (Dinheiro):');
-    bill.push(centerText('Aceite'));
-    bill.push('');
-    bill.push(line('='));
-    bill.push('');
-    bill.push(centerText('Obrigado pela preferencia!'));
-    bill.push(centerText('Aguardamos o seu pagamento'));
-    bill.push('');
-
-    return `<!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="UTF-8">
-          <title>Pre-Conta</title>
-          <style>
-            @page { size: 80mm auto; margin: 0; }
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body { 
-              font-family: 'Courier New', monospace;
-              font-size: 13px;
-              line-height: 1.4;
-              width: 80mm;
-              padding: 5mm;
-              background: #fff;
-              color: #000;
-              font-weight: bold;
-            }
-            pre { margin: 0; white-space: pre; font-family: inherit; color: #000; font-weight: bold; }
-            @media print {
-              body { padding: 2mm; color: #000 !important; }
-              pre { color: #000 !important; font-weight: bold !important; }
-            }
-          </style>
-        </head>
-        <body><pre>${bill.join('\n')}</pre></body>
-      </html>`;
-  }
-
-  const handleRequestPayment = useCallback(() => {
-    if (!selectedTable || orderItems.length === 0) return;
-    setShowCreditDialog(true);
-  }, [selectedTable, orderItems]);
+  }, [selectedTable, selectedOrder, tables, products, ingredients, addSale, business, updateOrder, auditLog]);
 
   const handleCreditConfirm = useCallback(async () => {
-    if (!selectedTable || !creditCustomerName.trim()) {
+    if (!selectedTable || !selectedOrder || !creditCustomerName.trim()) {
       toast({
         title: 'Nome do cliente obrigatório',
         description: 'Por favor, insira o nome do cliente',
@@ -423,24 +310,24 @@ export default function Tables() {
 
     try {
       const customerName = creditCustomerName.trim();
-      const itemCount = orderItems.length;
+      const itemCount = selectedOrder.items.length;
 
       const result = await registerCreditCharge(
         customerName,
-        orderItems,
-        total
+        selectedOrder.items,
+        selectedOrder.total
       );
 
       if (!result.success) {
-        throw new Error(result.error || 'Erro ao registrar crédito');
+        throw new Error(result.error || 'Erro ao registar crédito');
       }
 
       updateTable(selectedTable.id, { status: 'awaiting_payment' });
+      auditLog('table_credit', 'tables', selectedTable.id, { total: selectedOrder.total });
 
       setShowCreditDialog(false);
       setCreditCustomerName('');
       setSelectedTable(null);
-      setOrderItems([]);
 
       toast({
         title: 'Crédito registado com sucesso!',
@@ -454,17 +341,34 @@ export default function Tables() {
         variant: 'destructive',
       });
     }
-  }, [selectedTable, creditCustomerName, orderItems, total, registerCreditCharge, updateTable]);
+  }, [selectedTable, selectedOrder, creditCustomerName, registerCreditCharge, updateTable, auditLog]);
+
+  const handleFecharMesa = useCallback(async () => {
+    if (!selectedTable) return;
+    await updateTable(selectedTable.id, {
+      status: 'free',
+      currentOrderId: undefined,
+      customer_name: undefined,
+      closed_at: new Date(),
+    });
+    auditLog('table_close', 'tables', selectedTable.id, { payment: false });
+    setCloseConfirm(false);
+    setSelectedTable(null);
+    toast({ title: 'Mesa fechada' });
+  }, [selectedTable, updateTable, auditLog]);
+
+  const hasItems = Boolean(selectedOrder && selectedOrder.items.length > 0);
+  const totalValue = selectedOrder?.total ?? 0;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Users className="h-6 w-6 text-primary" />
+          <h1 className="text-h1 flex items-center gap-2">
+            <Users className="h-5 w-5 text-primary" />
             {t('nav.tables')}
           </h1>
-          <p className="text-muted-foreground">Gerir pedidos por mesa</p>
+          <p className="mt-1 text-sm text-muted-foreground">Mapa operacional das mesas do estabelecimento</p>
         </div>
         <Button onClick={() => setShowNewTableModal(true)}>
           <PlusCircle className="h-4 w-4 mr-2" />
@@ -472,215 +376,204 @@ export default function Tables() {
         </Button>
       </div>
 
-      {/* Legend */}
-      <div className="flex flex-wrap gap-4">
-        {Object.entries(statusLabels).map(([status, label]) => (
-          <div key={status} className="flex items-center gap-2">
-            <div className={cn("h-3 w-3 rounded-full", 
-              status === 'free' ? 'bg-success' : 
-              status === 'occupied' ? 'bg-primary' : 'bg-warning'
-            )} />
-            <span className="text-sm text-muted-foreground">{label}</span>
-          </div>
+      {/* Filtros */}
+      <div className="flex flex-wrap gap-1.5">
+        {STATUS_FILTERS.map(f => (
+          <button
+            key={f.key}
+            type="button"
+            onClick={() => setStatusFilter(f.key)}
+            className={cn(
+              'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+              statusFilter === f.key
+                ? 'border-primary bg-primary text-primary-foreground'
+                : 'border-border text-muted-foreground hover:border-primary/50 hover:text-foreground'
+            )}
+          >
+            {f.label}
+          </button>
         ))}
       </div>
 
-      {/* Tables Grid */}
+      {/* Mapa de mesas */}
       {tables.length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground">
-          <Users className="h-16 w-16 mx-auto mb-4 opacity-30" />
-          <p className="text-lg font-medium">Nenhuma mesa cadastrada</p>
-          <p className="text-sm mt-1">Clique em "Nova Mesa" para começar</p>
+        <div className="rounded-xl border bg-card">
+          <EmptyState
+            icon={Users}
+            title="Nenhuma mesa cadastrada"
+            description="Adicione as mesas do estabelecimento para começar a operar."
+            action={<Button onClick={() => setShowNewTableModal(true)}>Nova Mesa</Button>}
+          />
+        </div>
+      ) : allFree && statusFilter === 'all' ? (
+        <div className="rounded-xl border bg-card">
+          <EmptyState
+            icon={CheckCircle2}
+            title="Todas as mesas estão livres"
+            description="Toque numa mesa para abrir um pedido no POS."
+          />
+        </div>
+      ) : filteredTables.length === 0 ? (
+        <div className="rounded-xl border bg-card">
+          <EmptyState
+            icon={CheckCircle2}
+            title="Sem mesas neste filtro"
+            description="Não existem mesas com este estado."
+          />
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-        {tables.map((table) => {
-          const order = orders.find(o => o.id === table.currentOrderId);
-          return (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
+          {filteredTables.map(table => (
             <TableCard
               key={table.id}
               table={table}
-              order={order}
-              onTableClick={handleTableClick}
-              onManageTable={handleManageTable}
+              order={orderOf(table)}
+              now={now}
+              onOpen={openTableDialog}
+              onManage={handleManageTable}
             />
-          );
-        })}
+          ))}
         </div>
       )}
 
-      {/* Table Dialog */}
-      <Dialog open={!!selectedTable} onOpenChange={() => setSelectedTable(null)}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      {/* Diálogo da mesa */}
+      <Dialog open={Boolean(selectedTable)} onOpenChange={open => !open && setSelectedTable(null)}>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>{selectedTable?.name || `Mesa ${selectedTable?.number}`}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Armchair className="h-5 w-5 text-primary" />
+              {selectedTable?.name || `Mesa ${String(selectedTable?.number ?? '').padStart(2, '0')}`}
+              {selectedTable && (
+                <Badge variant="outline" className={STATUS_META[selectedTable.status].badge}>
+                  {STATUS_META[selectedTable.status].label}
+                </Badge>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedTable && (
+                <>
+                  {selectedTable.customer_name && (
+                    <span className="mr-3">Cliente: {selectedTable.customer_name}</span>
+                  )}
+                  <span className="inline-flex items-center gap-1">
+                    <Clock className="h-3.5 w-3.5" />
+                    {formatElapsed(selectedTable.opened_at, now)}
+                  </span>
+                </>
+              )}
+            </DialogDescription>
           </DialogHeader>
 
-          <div className="grid md:grid-cols-2 gap-6">
-            {/* Products */}
+          {selectedTable && (
             <div className="space-y-4">
-              <h3 className="font-semibold">Adicionar Itens</h3>
-              <div className="grid grid-cols-2 gap-2 max-h-[400px] overflow-y-auto pr-2">
-                {products.map((product) => (
-                  <button
-                    key={product.id}
-                    onClick={() => addItemToOrder(product)}
-                    className="p-3 rounded-lg border hover:border-primary hover:bg-primary/5 transition-colors text-left"
-                  >
-                    <div className="flex items-center gap-2">
-                      {product.image ? (
-                        <img src={product.image} alt={product.name} className="h-8 w-8 rounded object-cover" />
-                      ) : (
-                        <div className="h-8 w-8 rounded bg-muted" />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{product.name}</p>
-                        <p className="text-xs text-muted-foreground">{product.price} MT</p>
-                      </div>
-                    </div>
-                  </button>
-                ))}
+              {/* Resumo */}
+              <div className="grid grid-cols-3 gap-2">
+                <InfoCell label="Estado" value={STATUS_META[selectedTable.status].label} />
+                <InfoCell label="Itens" value={selectedOrder ? String(selectedOrder.items.length) : '0'} />
+                <InfoCell label="Total" value={formatCurrency(totalValue)} strong />
               </div>
-            </div>
 
-            {/* Order */}
-            <div className="space-y-4">
-              <h3 className="font-semibold">Pedido Atual</h3>
-              
-              {orderItems.length === 0 ? (
-                <p className="text-center py-8 text-muted-foreground">
-                  Nenhum item adicionado
-                </p>
-              ) : (
-                <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                  {orderItems.map((item) => (
-                    <div key={item.productId} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={() => removeItem(item.productId)}
-                          className="text-destructive hover:bg-destructive/10 p-1 rounded"
-                          aria-label="Remover item"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                        <div>
-                          <p className="font-medium text-sm">{item.product?.name ?? 'Produto'}</p>
-                          <p className="text-xs text-muted-foreground">{item.product?.price ?? 0} MT cada</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="icon-sm"
-                          onClick={() => updateItemQuantity(item.productId, -1)}
-                          aria-label="Diminuir quantidade"
-                        >
-                          <Minus className="h-3 w-3" />
-                        </Button>
-                        <span className="w-8 text-center font-medium">{item.quantity}</span>
-                        <Button
-                          variant="outline"
-                          size="icon-sm"
-                          onClick={() => updateItemQuantity(item.productId, 1)}
-                          aria-label="Aumentar quantidade"
-                        >
-                          <Plus className="h-3 w-3" />
-                        </Button>
-                        <span className="w-20 text-right font-medium">
-                          {item.subtotal.toLocaleString('pt-MZ')} MT
+              {/* Itens do pedido */}
+              {selectedOrder ? (
+                <div className="max-h-44 space-y-1.5 overflow-y-auto rounded-lg border bg-muted/20 p-2">
+                  {selectedOrder.items.length === 0 ? (
+                    <p className="py-2 text-center text-xs text-muted-foreground">Sem itens no pedido.</p>
+                  ) : (
+                    selectedOrder.items.map((item, idx) => (
+                      <div key={idx} className="flex items-center justify-between gap-2 px-1 text-sm">
+                        <span className="flex min-w-0 items-center gap-1.5">
+                          <span className="font-semibold tabular-nums">{item.quantity}×</span>
+                          <span className="truncate">{item.product?.name ?? 'Produto'}</span>
+                        </span>
+                        <span className="shrink-0 text-muted-foreground tabular-nums">
+                          {formatCurrency(item.subtotal)}
                         </span>
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
+              ) : (
+                <p className="rounded-lg border bg-muted/20 p-3 text-center text-xs text-muted-foreground">
+                  Mesa sem pedido activo.
+                </p>
               )}
 
-              {/* Total */}
-              <div className="border-t pt-4">
-                <div className="flex justify-between text-lg font-bold">
-                  <span>Total</span>
-                  <span className="text-primary">{total.toLocaleString('pt-MZ')} MT</span>
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="space-y-2 pt-4">
-                {selectedTable?.status !== 'awaiting_payment' ? (
+              {/* Acções */}
+              <div className="space-y-2">
+                {selectedTable.status === 'free' ? (
+                  <Button variant="gradient" size="lg" className="w-full" onClick={() => goToPos(selectedTable)}>
+                    <Check className="h-4 w-4 mr-2" /> Abrir pedido
+                  </Button>
+                ) : (
                   <>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        className="flex-1"
-                        onClick={handleSaveOrder}
-                        disabled={orderItems.length === 0}
-                      >
-                        Guardar Pedido
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button variant="outline" size="lg" onClick={() => goToPos(selectedTable)}>
+                        <ChevronRight className="h-4 w-4 mr-1.5" />
+                        {selectedTable.status === 'awaiting_payment' ? 'Adicionar itens' : 'Continuar pedido'}
                       </Button>
-                      <Button
-                        variant="gradient"
-                        className="flex-1"
-                        onClick={handleRequestPayment}
-                        disabled={orderItems.length === 0}
-                      >
-                        Pedir Conta
+                      <Button variant="outline" size="lg" onClick={printPreBillForOrder} disabled={!hasItems}>
+                        <Receipt className="h-4 w-4 mr-1.5" /> Imprimir conta
                       </Button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {selectedTable.status === 'awaiting_payment' ? (
+                        <Button variant="gradient" size="lg" className="col-span-2" onClick={() => setShowPaymentModal(true)} disabled={!hasItems}>
+                          <Check className="h-4 w-4 mr-2" /> Finalizar pagamento
+                        </Button>
+                      ) : (
+                        <>
+                          <Button variant="outline" size="lg" onClick={() => setShowCreditDialog(true)} disabled={!hasItems}>
+                            <HandCoins className="h-4 w-4 mr-1.5" /> Pedir conta
+                          </Button>
+                          <Button variant="gradient" size="lg" onClick={() => setShowPaymentModal(true)} disabled={!hasItems}>
+                            <Check className="h-4 w-4 mr-1.5" /> Pagar
+                          </Button>
+                        </>
+                      )}
                     </div>
                     <Button
                       variant="outline"
-                      className="w-full"
-                      onClick={printPreBill}
-                      disabled={orderItems.length === 0}
+                      size="lg"
+                      className="w-full text-destructive hover:bg-destructive/10"
+                      onClick={() => setCloseConfirm(true)}
                     >
-                      <Receipt className="h-4 w-4 mr-2" />
-                      Imprimir Conta
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Button
-                      variant="outline"
-                      className="w-full"
-                      onClick={printPreBill}
-                      disabled={orderItems.length === 0}
-                    >
-                      <Receipt className="h-4 w-4 mr-2" />
-                      Imprimir Conta
-                    </Button>
-                    <Button
-                      variant="gradient"
-                      className="w-full"
-                      onClick={() => setShowPaymentModal(true)}
-                    >
-                      <Check className="h-4 w-4 mr-2" />
-                      Finalizar Pagamento
+                      <Square className="h-4 w-4 mr-2" /> Fechar mesa
                     </Button>
                   </>
                 )}
+
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full text-muted-foreground"
+                  onClick={() => handleManageTable(selectedTable)}
+                >
+                  <Settings2 className="h-4 w-4 mr-1.5" /> Gerir mesa
+                </Button>
               </div>
             </div>
-          </div>
+          )}
         </DialogContent>
       </Dialog>
 
-      {/* Payment Modal */}
+      {/* Pagamento */}
       <PaymentModal
         open={showPaymentModal}
         onClose={() => setShowPaymentModal(false)}
-        totalAmount={total}
+        totalAmount={totalValue}
         onConfirm={handlePaymentConfirm}
       />
 
-      {/* Credit Dialog */}
+      {/* Crédito */}
       <Dialog open={showCreditDialog} onOpenChange={setShowCreditDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Registar Crédito</DialogTitle>
+            <DialogDescription>
+              O cliente levará os produtos agora e pagará depois.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
-              <p className="text-sm font-medium text-blue-700 dark:text-blue-400">📝 Registar mesa como crédito</p>
-              <p className="text-xs text-blue-600 dark:text-blue-300 mt-1">O cliente levará os produtos agora e pagará depois</p>
-            </div>
             <div className="space-y-2">
               <Label htmlFor="table-customer-name">Nome do Cliente *</Label>
               <Input
@@ -690,34 +583,41 @@ export default function Tables() {
                 value={creditCustomerName}
                 onChange={(e) => setCreditCustomerName(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleCreditConfirm();
-                  }
+                  if (e.key === 'Enter') handleCreditConfirm();
                 }}
                 autoFocus
               />
             </div>
           </div>
-          <div className="flex gap-2 justify-end">
+          <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setShowCreditDialog(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleCreditConfirm} className="bg-blue-600 hover:bg-blue-700">
+            <Button variant="gradient" onClick={handleCreditConfirm}>
               Registar Crédito
             </Button>
-          </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Table Management Modal */}
+      {/* Fechar mesa */}
+      <ConfirmDialog
+        open={closeConfirm}
+        onOpenChange={setCloseConfirm}
+        onConfirm={handleFecharMesa}
+        title="Fechar mesa"
+        description="A mesa será libertada sem registar pagamento. Continuar?"
+        confirmText="Fechar mesa"
+        variant="destructive"
+      />
+
+      {/* Gestão / nova mesa */}
       <TableManagementModal
         open={showManagementModal}
         onClose={() => setShowManagementModal(false)}
         table={managingTable}
         onSave={handleSaveTableManagement}
       />
-
-      {/* New Table Modal */}
       <NewTableModal
         open={showNewTableModal}
         onClose={() => setShowNewTableModal(false)}
@@ -726,72 +626,89 @@ export default function Tables() {
       />
     </div>
   );
-};
+}
 
-const TableCard = memo(({
+function InfoCell({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+  return (
+    <div className="rounded-lg border bg-muted/30 px-3 py-2">
+      <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className={cn('mt-0.5 truncate tabular-nums', strong ? 'text-base font-semibold text-primary' : 'text-sm font-medium')}>
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function TableCard({
   table,
   order,
-  onTableClick,
-  onManageTable,
+  now,
+  onOpen,
+  onManage,
 }: {
   table: Table;
   order: Order | undefined;
-  onTableClick: (table: Table, e: React.MouseEvent) => void;
-  onManageTable: (table: Table) => void;
-}) => {
+  now: number;
+  onOpen: (table: Table, e: React.MouseEvent) => void;
+  onManage: (table: Table) => void;
+}) {
+  const meta = STATUS_META[table.status] ?? STATUS_META.free;
+  const itemCount = order ? order.items.length : 0;
+  const total = order?.total ?? 0;
+  const free = table.status === 'free';
+
   return (
     <div className="relative">
       <button
-        onClick={(e) => onTableClick(table, e)}
+        onClick={(e) => onOpen(table, e)}
         className={cn(
-          "w-full p-6 rounded-xl border-2 transition-all duration-200 hover:scale-105 hover:shadow-lg text-left",
-          statusColors[table.status]
+          'flex w-full flex-col gap-2 rounded-xl border bg-card p-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg border-l-4',
+          meta.accent
         )}
+        aria-label={`Mesa ${table.number}, ${meta.label}`}
       >
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-2xl font-bold">{table.name || `Mesa ${table.number}`}</span>
-          <div className={cn(
-            "h-3 w-3 rounded-full",
-            table.status === 'free' ? 'bg-success' :
-            table.status === 'occupied' ? 'bg-primary' : 'bg-warning'
-          )} />
+        <div className="flex items-center justify-between gap-2">
+          <span className="truncate text-lg font-bold tabular-nums">{table.name || `Mesa ${table.number}`}</span>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <Settings2
+              className="manage-btn h-4 w-4 cursor-pointer text-muted-foreground transition-colors hover:text-primary"
+              onClick={(e) => {
+                e.stopPropagation();
+                onManage(table);
+              }}
+              aria-label="Gerir mesa"
+            />
+            <span className={cn('h-2.5 w-2.5 rounded-full', meta.dot)} />
+          </div>
         </div>
-        <Badge variant="outline" className={statusColors[table.status]}>
-          {statusLabels[table.status]}
-        </Badge>
-        {table.customer_name && (
-          <p className="text-sm mt-2 font-medium truncate">
-            {table.customer_name}
-          </p>
-        )}
-        {order && (
-          <>
-            <div className="mt-3 space-y-1 border-t pt-2">
-              <p className="text-xs font-semibold text-muted-foreground">Itens:</p>
-              {order.items.slice(0, 3).map((item, idx) => (
-                <p key={idx} className="text-xs truncate">
-                  {item.quantity}x {item.product?.name ?? 'Produto'}
-                </p>
-              ))}
-              {order.items.length > 3 && (
-                <p className="text-xs text-muted-foreground">+{order.items.length - 3} mais...</p>
-              )}
+
+        <div>
+          <Badge variant="outline" className={cn('gap-1', meta.badge)}>
+            <CircleDot className="h-3 w-3" />
+            {meta.label}
+          </Badge>
+        </div>
+
+        {free ? (
+          <p className="text-xs text-muted-foreground">Disponível para pedido</p>
+        ) : (
+          <div className="space-y-1.5 border-t pt-2">
+            {table.customer_name && (
+              <p className="truncate text-xs text-muted-foreground">{table.customer_name}</p>
+            )}
+            <div className="flex items-center justify-between text-xs">
+              <span className="inline-flex items-center gap-1 text-muted-foreground">
+                <span className="font-semibold text-foreground tabular-nums">{itemCount}</span> itens
+              </span>
+              <span className="inline-flex items-center gap-1 text-muted-foreground">
+                <Clock className="h-3 w-3" />
+                {formatElapsed(table.opened_at, now)}
+              </span>
             </div>
-            <p className="text-sm mt-2 font-bold">
-              {order.total.toLocaleString('pt-MZ')} MT
-            </p>
-          </>
+            <p className="text-base font-bold tabular-nums text-primary">{formatCurrency(total)}</p>
+          </div>
         )}
       </button>
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        className="manage-btn absolute top-2 right-2"
-        onClick={() => onManageTable(table)}
-        aria-label="Gerir mesa"
-      >
-        <Settings2 className="h-4 w-4" />
-      </Button>
     </div>
   );
-});
+}

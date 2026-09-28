@@ -11,7 +11,7 @@ import { formatCurrency } from '@/lib/utils';
 interface PaymentModalProps {
   open: boolean;
   onClose: () => void;
-  onSave: (amount: number, method: string, description?: string) => Promise<any>;
+  onSave: (amount: number, method: string, description?: string, reference?: string) => Promise<any>;
   customer: Customer | null;
 }
 
@@ -19,6 +19,7 @@ const PaymentModal = memo(function PaymentModal({ open, onClose, onSave, custome
   const [amount, setAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [description, setDescription] = useState('');
+  const [reference, setReference] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -26,17 +27,18 @@ const PaymentModal = memo(function PaymentModal({ open, onClose, onSave, custome
     if (!customer) return;
 
     const amountNum = parseFloat(amount);
-    if (amountNum <= 0 || amountNum > customer.current_balance) {
+    if (amountNum <= 0 || amountNum > customer.currentBalance) {
       return;
     }
 
     setLoading(true);
-    const result = await onSave(amountNum, paymentMethod, description || undefined);
+    const result = await onSave(amountNum, paymentMethod, description || undefined, reference || undefined);
     setLoading(false);
 
     if (result.success) {
       setAmount('');
       setDescription('');
+      setReference('');
       onClose();
     }
   };
@@ -44,6 +46,7 @@ const PaymentModal = memo(function PaymentModal({ open, onClose, onSave, custome
   const handleClose = () => {
     setAmount('');
     setDescription('');
+    setReference('');
     onClose();
   };
 
@@ -64,7 +67,7 @@ const PaymentModal = memo(function PaymentModal({ open, onClose, onSave, custome
             <div className="flex justify-between">
               <span className="text-sm text-muted-foreground">Dívida Atual:</span>
               <span className="font-semibold text-destructive">
-                {formatCurrency(customer.current_balance)}
+                {formatCurrency(customer.currentBalance)}
               </span>
             </div>
           </div>
@@ -76,7 +79,7 @@ const PaymentModal = memo(function PaymentModal({ open, onClose, onSave, custome
                 id="amount"
                 type="number"
                 step="0.01"
-                max={customer.current_balance}
+                max={customer.currentBalance}
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0.00"
@@ -84,7 +87,7 @@ const PaymentModal = memo(function PaymentModal({ open, onClose, onSave, custome
                 disabled={loading}
               />
               <p className="text-xs text-muted-foreground">
-                Máximo: {formatCurrency(customer.current_balance)}
+                Máximo: {formatCurrency(customer.currentBalance)}
               </p>
             </div>
 
@@ -109,6 +112,17 @@ const PaymentModal = memo(function PaymentModal({ open, onClose, onSave, custome
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="reference">Referência</Label>
+              <Input
+                id="reference"
+                value={reference}
+                onChange={(e) => setReference(e.target.value)}
+                placeholder="Ref. transferência / recibo..."
+                disabled={loading}
+              />
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="description">Observações</Label>
               <Textarea
                 id="description"
@@ -125,7 +139,7 @@ const PaymentModal = memo(function PaymentModal({ open, onClose, onSave, custome
                 <div className="flex justify-between text-sm">
                   <span>Novo Saldo:</span>
                   <span className="font-semibold">
-                    {formatCurrency(customer.current_balance - parseFloat(amount))}
+                    {formatCurrency(customer.currentBalance - parseFloat(amount))}
                   </span>
                 </div>
               </div>

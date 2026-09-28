@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Users, Plus, Search, Gift, Phone, Mail, Calendar, TrendingUp, Loader2, History, Coins } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Users, Plus, Search, Gift, Phone, Mail, Calendar, TrendingUp, Loader2, History, Coins, CreditCard, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/ui/page-header';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useI18n } from '@/contexts/I18nContext';
@@ -20,11 +22,15 @@ interface Customer {
   name: string;
   phone: string;
   email?: string;
+  nuit?: string;
   birth_date?: string;
   loyalty_points: number;
   total_spent: number;
   visit_count: number;
   last_visit_at?: string;
+  credit_limit: number;
+  current_balance: number;
+  status: 'active' | 'blocked' | 'inactive';
 }
 
 interface LoyaltyTx {
@@ -35,11 +41,15 @@ interface LoyaltyTx {
   created_at: string;
 }
 
+type StatusFilter = 'all' | 'active' | 'blocked' | 'inactive';
+
 export default function Customers() {
+  const navigate = useNavigate();
   const { business } = useBusiness();
   const { t } = useI18n();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -66,7 +76,6 @@ export default function Customers() {
         .from('customers')
         .select('*')
         .eq('business_id', business.id)
-        .eq('active', true)
         .order('total_spent', { ascending: false });
 
       if (error) throw error;
@@ -80,10 +89,17 @@ export default function Customers() {
 
 
 
-  const filteredCustomers = customers.filter(c =>
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    c.phone.includes(search)
-  );
+  const filteredCustomers = customers.filter(c => {
+    const query = search.toLowerCase();
+    const matchesSearch =
+      !search ||
+      c.name.toLowerCase().includes(query) ||
+      c.phone.toLowerCase().includes(query) ||
+      (c.email || '').toLowerCase().includes(query) ||
+      (c.nuit || '').toLowerCase().includes(query);
+    const matchesStatus = statusFilter === 'all' || c.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
   const openDetail = async (customer: Customer) => {
     setDetailCustomer(customer);
@@ -173,6 +189,7 @@ export default function Customers() {
   const totalCustomers = customers.length;
   const totalPoints = customers.reduce((acc, c) => acc + c.loyalty_points, 0);
   const totalRevenue = customers.reduce((acc, c) => acc + c.total_spent, 0);
+  const totalDebt = customers.reduce((acc, c) => acc + c.current_balance, 0);
 
   if (loading) {
     return (
@@ -188,20 +205,20 @@ export default function Customers() {
       <PageHeader
         icon={<Users className="h-6 w-6" />}
         title={t('nav.customers')}
-        description="Gestão de clientes e programa de fidelidade"
+        description="Gestão de clientes, crédito e fidelidade"
       >
         <Button onClick={() => setDialogOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
-          Novo Cliente
+          {t('common.new')}
         </Button>
       </PageHeader>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-card border rounded-xl p-5">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Total de Clientes</p>
+              <p className="text-sm text-muted-foreground">{t('customers.total')}</p>
               <p className="text-2xl font-bold mt-1">{totalCustomers}</p>
             </div>
             <div className="p-3 bg-primary/10 rounded-xl">
@@ -213,7 +230,7 @@ export default function Customers() {
         <div className="bg-card border rounded-xl p-5">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Pontos Totais</p>
+              <p className="text-sm text-muted-foreground">{t('customers.points')}</p>
               <p className="text-2xl font-bold mt-1">{totalPoints.toLocaleString()}</p>
             </div>
             <div className="p-3 bg-success/10 rounded-xl">
@@ -225,7 +242,19 @@ export default function Customers() {
         <div className="bg-card border rounded-xl p-5">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Receita Total</p>
+              <p className="text-sm text-muted-foreground">{t('customers.totalDebt')}</p>
+              <p className="text-2xl font-bold mt-1">{formatCurrency(totalDebt)}</p>
+            </div>
+            <div className="p-3 bg-destructive/10 rounded-xl">
+              <CreditCard className="h-6 w-6 text-destructive" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-card border rounded-xl p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground">{t('customers.revenue')}</p>
               <p className="text-2xl font-bold mt-1">{formatCurrency(totalRevenue)}</p>
             </div>
             <div className="p-3 bg-warning/10 rounded-xl">
@@ -235,76 +264,140 @@ export default function Customers() {
         </div>
       </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Pesquisar por nome ou telefone..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-10"
-        />
+      {/* Search + Filter */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder={t('customers.search')}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+          <SelectTrigger className="w-full sm:w-56">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t('customers.filter.all')}</SelectItem>
+            <SelectItem value="active">{t('customers.status.active')}</SelectItem>
+            <SelectItem value="blocked">{t('customers.status.blocked')}</SelectItem>
+            <SelectItem value="inactive">{t('customers.status.inactive')}</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Customers Grid */}
       <div className="list-panel grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredCustomers.map((customer) => (
-          <div key={customer.id} className="bg-card border rounded-xl p-4 space-y-3">
-            <div className="flex items-start justify-between">
-              <div>
-                <h3 className="font-semibold">{customer.name}</h3>
-                <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
-                  <Phone className="h-3 w-3" />
-                  {customer.phone}
-                </div>
-                {customer.email && (
-                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                    <Mail className="h-3 w-3" />
-                    {customer.email}
+        {filteredCustomers.map((customer) => {
+          const usagePct = customer.credit_limit > 0
+            ? Math.min((customer.current_balance / customer.credit_limit) * 100, 100)
+            : 0;
+          const nearLimit = usagePct >= 80;
+          const isBlocked = customer.status === 'blocked';
+
+          return (
+            <div key={customer.id} className="bg-card border rounded-xl p-4 space-y-3">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="font-semibold">{customer.name}</h3>
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
+                    <Phone className="h-3 w-3" />
+                    {customer.phone}
                   </div>
-                )}
+                  {customer.email && (
+                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                      <Mail className="h-3 w-3" />
+                      {customer.email}
+                    </div>
+                  )}
+                  {customer.nuit && (
+                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                      <Wallet className="h-3 w-3" />
+                      {customer.nuit}
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-col items-end gap-1">
+                  <Badge variant={isBlocked ? 'destructive' : nearLimit ? 'destructive' : 'secondary'} className="flex items-center gap-1">
+                    <Gift className="h-3 w-3" />
+                    {customer.loyalty_points}
+                  </Badge>
+                  <Badge variant={isBlocked ? 'destructive' : 'outline'} className="text-[10px]">
+                    {customer.status === 'active'
+                      ? t('customers.status.active')
+                      : customer.status === 'blocked'
+                        ? t('customers.status.blocked')
+                        : t('customers.status.inactive')}
+                  </Badge>
+                </div>
               </div>
-              <Badge variant="secondary" className="flex items-center gap-1">
-                <Gift className="h-3 w-3" />
-                {customer.loyalty_points}
-              </Badge>
+
+              {customer.current_balance > 0 && (
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground flex items-center gap-1">
+                      <CreditCard className="h-3.5 w-3.5" /> {t('customers.debt')}
+                    </span>
+                    <span className="font-semibold text-destructive">
+                      {formatCurrency(customer.current_balance)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>{t('customers.creditAvailable')}</span>
+                    <span>{formatCurrency(Math.max(customer.credit_limit - customer.current_balance, 0))} / {formatCurrency(customer.credit_limit)}</span>
+                  </div>
+                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className={`h-full ${nearLimit ? 'bg-destructive' : 'bg-primary'}`}
+                      style={{ width: `${usagePct}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-2 pt-3 border-t">
+                <div>
+                  <p className="text-xs text-muted-foreground">{t('customers.totalSpent')}</p>
+                  <p className="font-semibold">{formatCurrency(customer.total_spent)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">{t('customers.visits')}</p>
+                  <p className="font-semibold">{customer.visit_count}</p>
+                </div>
+              </div>
+
+              {customer.last_visit_at && (
+                <div className="text-xs text-muted-foreground">
+                  {t('customers.lastPurchase')}: {format(new Date(customer.last_visit_at), 'dd/MM/yyyy', { locale: pt })}
+                </div>
+              )}
+
+              {customer.birth_date && (
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Calendar className="h-3 w-3" />
+                  {format(new Date(customer.birth_date), 'dd/MM', { locale: pt })}
+                </div>
+              )}
+
+              <div className="flex gap-2 mt-1">
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => openDetail(customer)}>
+                  <History className="h-3.5 w-3.5 mr-1" />
+                  {t('customers.pointsHistory')}
+                </Button>
+                <Button variant="gradient" size="sm" className="flex-1" onClick={() => navigate(`/customers/${customer.id}`)}>
+                  {t('customers.openProfile')}
+                </Button>
+              </div>
             </div>
-
-            <div className="grid grid-cols-2 gap-2 pt-3 border-t">
-              <div>
-                <p className="text-xs text-muted-foreground">Total Gasto</p>
-                <p className="font-semibold">{formatCurrency(customer.total_spent)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Visitas</p>
-                <p className="font-semibold">{customer.visit_count}</p>
-              </div>
-            </div>
-
-            {customer.last_visit_at && (
-              <div className="text-xs text-muted-foreground">
-                Última visita: {format(new Date(customer.last_visit_at), 'dd/MM/yyyy', { locale: pt })}
-              </div>
-            )}
-
-            {customer.birth_date && (
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Calendar className="h-3 w-3" />
-                {format(new Date(customer.birth_date), 'dd/MM', { locale: pt })}
-              </div>
-            )}
-
-            <Button variant="outline" size="sm" className="w-full mt-1" onClick={() => openDetail(customer)}>
-              <History className="h-3.5 w-3.5 mr-1" />
-              Histórico de Pontos
-            </Button>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {filteredCustomers.length === 0 && !loading && (
         <div className="text-center py-12 text-muted-foreground">
-          {search ? 'Nenhum cliente encontrado' : 'Nenhum cliente cadastrado'}
+          {search || statusFilter !== 'all' ? t('customers.noneFound') : t('customers.noneRegistered')}
         </div>
       )}
 
@@ -368,7 +461,7 @@ export default function Customers() {
               </div>
             ) : loyaltyHistory.length === 0 ? (
               <p className="text-center py-6 text-sm text-muted-foreground">
-                Sem movimentos de pontos ainda. Associos clientes ao registar vendas no PDV.
+                Sem movimentos de pontos ainda. Associe clientes ao registar vendas no PDV.
               </p>
             ) : (
               <div className="border rounded-lg divide-y max-h-64 overflow-y-auto">
