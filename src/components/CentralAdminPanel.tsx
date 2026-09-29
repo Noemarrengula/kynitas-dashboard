@@ -101,7 +101,7 @@ export function CentralAdminPanel() {
           .eq('business_id', business.id)
           .order('created_at', { ascending: false })
           .limit(1)
-          .single();
+          .maybeSingle();
 
         stats.push({
           id: business.id,
@@ -130,30 +130,22 @@ export function CentralAdminPanel() {
 
   const loadAllUsers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('business_users')
-        .select(`
-          id,
-          business_id,
-          role,
-          active,
-          created_at,
-          businesses!inner(name),
-          auth.users!inner(email, raw_user_meta_data)
-        `);
+      const { data, error } = await supabase.rpc('list_business_users', {
+        p_business_id: null,
+      });
 
       if (error) throw error;
 
-      const users: BusinessUser[] = data?.map((item: any) => ({
-        id: item.id,
+      const users: BusinessUser[] = (data || []).map((item: any) => ({
+        id: item.user_id,
         business_id: item.business_id,
-        name: item.auth?.users?.raw_user_meta_data?.name || 'Sem nome',
-        email: item.auth?.users?.email || '',
+        name: item.name || 'Sem nome',
+        email: item.email || '',
         role: item.role,
         active: item.active,
-        business_name: item.businesses?.name || '',
+        business_name: item.business_name || '',
         created_at: item.created_at,
-      })) || [];
+      }));
 
       setAllUsers(users);
     } catch (error: unknown) {
