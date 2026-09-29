@@ -105,7 +105,7 @@ const navSections: NavSection[] = [
     labelKey: 'nav.section.procurement',
     items: [
       { icon: Truck, labelKey: 'nav.suppliers', path: '/fornecedores', feature: 'inventario_visualizar', exact: true },
-      { icon: ReceiptText, labelKey: 'nav.purchases', path: '/compras', feature: 'inventario_visualizar', exact: true },
+      { icon: ReceiptText, labelKey: 'nav.purchases', path: '/compras', feature: 'compras', exact: true },
       { icon: PackageCheck, labelKey: 'nav.receipts', path: '/rececoes', feature: 'inventario_visualizar' },
       { icon: PackageX, labelKey: 'nav.losses', path: '/perdas', feature: 'inventario_visualizar' },
     ],

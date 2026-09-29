@@ -131,9 +131,9 @@ const App = () => (
                   />
                   <Route path="/fornecedores" element={<ErrorBoundary><ProtectedRoute requiredFeature="inventario_visualizar"><Suppliers /></ProtectedRoute></ErrorBoundary>} />
                   <Route path="/fornecedores/:id" element={<ErrorBoundary><ProtectedRoute requiredFeature="inventario_visualizar"><SupplierDetail /></ProtectedRoute></ErrorBoundary>} />
-                  <Route path="/compras/nova" element={<ErrorBoundary><ProtectedRoute requiredFeature="inventario_visualizar"><PurchasesNew /></ProtectedRoute></ErrorBoundary>} />
-                  <Route path="/compras/:id" element={<ErrorBoundary><ProtectedRoute requiredFeature="inventario_visualizar"><PurchaseDetail /></ProtectedRoute></ErrorBoundary>} />
-                  <Route path="/compras" element={<ErrorBoundary><ProtectedRoute requiredFeature="inventario_visualizar"><Purchases /></ProtectedRoute></ErrorBoundary>} />
+                  <Route path="/compras/nova" element={<ErrorBoundary><ProtectedRoute requiredFeature="compras"><PurchasesNew /></ProtectedRoute></ErrorBoundary>} />
+                  <Route path="/compras/:id" element={<ErrorBoundary><ProtectedRoute requiredFeature="compras"><PurchaseDetail /></ProtectedRoute></ErrorBoundary>} />
+                  <Route path="/compras" element={<ErrorBoundary><ProtectedRoute requiredFeature="compras"><Purchases /></ProtectedRoute></ErrorBoundary>} />
                   <Route path="/rececoes" element={<ErrorBoundary><ProtectedRoute requiredFeature="inventario_visualizar"><Receipts /></ProtectedRoute></ErrorBoundary>} />
                   <Route path="/perdas" element={<ErrorBoundary><ProtectedRoute requiredFeature="inventario_visualizar"><Losses /></ProtectedRoute></ErrorBoundary>} />
                 </Route>

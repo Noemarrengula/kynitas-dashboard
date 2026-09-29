@@ -11,6 +11,7 @@ export type Feature =
   | 'creditos'
   | 'clientes'
   | 'cobrancas'
+  | 'compras'
   | 'funcionarios'
   | 'metas'
   | 'facturas'
@@ -39,6 +40,7 @@ const FEATURE_ROLES: Record<Feature, BusinessRole[]> = {
   creditos: ['admin', 'supervisor', 'caixa'],
   clientes: ['admin', 'supervisor', 'caixa'],
   cobrancas: ['admin', 'supervisor'],
+  compras: ['admin', 'supervisor'],
   funcionarios: ['admin', 'supervisor'],
   metas: ['admin', 'supervisor'],
   facturas: ['admin', 'supervisor'],
