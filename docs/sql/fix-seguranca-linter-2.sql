@@ -78,22 +78,24 @@ REVOKE EXECUTE ON FUNCTION public.user_has_business_access(uuid)                
 REVOKE EXECUTE ON FUNCTION public.validate_api_key(text)                                     FROM authenticated;
 
 -- ---------------------------------------------------------------------------
+-- 4) CORRECÇÃO DE OMISSÃO DO FIX-1: deactivate_business_user
+--    Ficou de fora do REVOKE ... FROM PUBLIC do fix-seguranca-linter.sql;
+--    como o PUBLIC tinha EXECUTE por omissão, o anon ainda a executava.
+--    A app chama-a via supabase-admin.ts como authenticated.
+-- ---------------------------------------------------------------------------
+REVOKE EXECUTE ON FUNCTION public.deactivate_business_user(uuid, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.deactivate_business_user(uuid, uuid) TO authenticated, service_role;
+
+-- ===========================================================================
 -- 3) VERIFICAÇÃO (opcional) — grants actuais de anon/authenticated nas funções
 -- ---------------------------------------------------------------------------
 SELECT p.proname,
        pg_get_function_identity_arguments(p.oid) AS args,
-       bool_or(CASE WHEN g.grantee = 'anon' THEN true ELSE false END)            AS anon_can_execute,
-       bool_or(CASE WHEN g.grantee = 'authenticated' THEN true ELSE false END)   AS auth_can_execute
+       bool_or(g.grantee = 'anon'::regrole AND g.privilege_type = 'EXECUTE')            AS anon_can_execute,
+       bool_or(g.grantee = 'authenticated'::regrole AND g.privilege_type = 'EXECUTE')   AS auth_can_execute
 FROM pg_proc p
 JOIN pg_namespace n ON n.oid = p.pronamespace
-LEFT JOIN (
-  SELECT c.oid AS func_oid, grantee
-  FROM pg_proc c
-  JOIN pg_namespace s ON s.oid = c.pronamespace
-  CROSS JOIN LATERAL unnest(c.proacl) AS acl
-  JOIN LATERAL aclexplode(acl) AS g ON TRUE
-  WHERE s.nspname = 'public'
-) g ON g.func_oid = p.oid
+LEFT JOIN LATERAL aclexplode(p.proacl) AS g ON TRUE
 WHERE n.nspname = 'public' AND p.prosecdef
   AND p.proname IN (
     'add_bonus_points','app_has_business_access','app_has_role','app_log_audit',
