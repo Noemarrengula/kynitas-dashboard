@@ -316,6 +316,7 @@ export function useDatabase() {
             const c = toCamelCase(sale);
             return {
               ...c,
+              items: sale.items || [],
               paymentDetails: sale.payment_details || {},
               createdAt: sale.created_at,
             } as unknown as Sale;

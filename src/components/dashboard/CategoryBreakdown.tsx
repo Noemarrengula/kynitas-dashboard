@@ -28,7 +28,7 @@ export function CategoryBreakdown({ sales }: CategoryBreakdownProps) {
     const map = new Map<string, { revenue: number; count: number }>();
 
     sales.forEach((sale) => {
-      sale.items.forEach((item) => {
+      (sale.items || []).forEach((item) => {
         const key = resolveCategory(item.product?.category, item.product?.type);
         const entry = map.get(key) || { revenue: 0, count: 0 };
         entry.revenue += item.subtotal;

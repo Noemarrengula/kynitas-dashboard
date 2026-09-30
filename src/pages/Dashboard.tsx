@@ -197,7 +197,7 @@ export default function Dashboard() {
       let grossProfit = 0;
       let revenue = 0;
       salesList.forEach(s =>
-        s.items.forEach(item => {
+        (s.items || []).forEach(item => {
           const p = profitByProduct[item.productId];
           if (!p || p.realUnitCost <= 0) {
             costAvailable = false;
