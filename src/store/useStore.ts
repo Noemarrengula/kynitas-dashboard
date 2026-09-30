@@ -103,10 +103,10 @@ export const useStore = create<AppState>((set) => ({
 
   // Sales
   sales: [],
-  setSales: (sales) => set({ sales }),
+  setSales: (sales) => set({ sales: sales.map((s) => ({ ...s, items: s.items || [] })) }),
   clearSales: () => set({ sales: [] }),
   addSale: (sale) => set((state) => ({
-    sales: [...state.sales, sale],
+    sales: [...state.sales, { ...sale, items: sale.items || [] }],
   })),
   
   // Stock movements

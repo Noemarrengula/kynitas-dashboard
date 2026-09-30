@@ -171,6 +171,7 @@ export function useDatabase() {
     if (salesCache?.rows) {
       const transformedSales = salesCache.rows.map(sale => ({
         ...toCamelCase(sale),
+        items: sale.items || [],
         paymentDetails: sale.payment_details || {},
         createdAt: sale.created_at,
       }));
@@ -201,7 +202,7 @@ export function useDatabase() {
   // Dedução de stock local (mesma lógica nos caminhos online e offline)
   const applyLocalStockDeduction = (sale: Omit<Sale, 'id'>) => {
     const updatedProducts = useStore.getState().products.map(product => {
-      const saleItems = sale.items.filter(item => item.productId === product.id);
+      const saleItems = (sale.items || []).filter(item => item.productId === product.id);
       if (saleItems.length === 0) return product;
 
       let totalDeduction = 0;
@@ -933,7 +934,7 @@ export function useDatabase() {
     const salesMap: Record<string, { totalSales: number; totalRevenue: number }> = {};
 
     sales.forEach(sale => {
-      sale.items.forEach(item => {
+      (sale.items || []).forEach(item => {
         const productId = item.productId;
         const quantity = item.quantity;
         const subtotal = item.subtotal;
@@ -1013,7 +1014,7 @@ export function useDatabase() {
     sales.forEach(sale => {
       const ts = new Date(sale.createdAt).getTime();
       if (Number.isNaN(ts) || ts < forecastCutoff) return;
-      sale.items.forEach(item => {
+      (sale.items || []).forEach(item => {
         consumed[item.productId] = (consumed[item.productId] || 0) + item.quantity;
       });
     });
@@ -1060,7 +1061,7 @@ export function useDatabase() {
     sales.forEach(sale => {
       const ts = new Date(sale.createdAt).getTime();
       if (Number.isNaN(ts) || ts < forecastCutoff) return;
-      sale.items.forEach(item => {
+      (sale.items || []).forEach(item => {
         const product = products.find(p => p.id === item.productId);
         if (!product?.recipe || !Array.isArray(product.recipe)) return;
         product.recipe.forEach(recipeItem => {
