@@ -11,7 +11,7 @@ Payloads enviados ao PostgREST com colunas que **não existem** na tabela → HT
 | Bug | Ficheiro | Estado |
 |---|---|---|
 | `ivaRate` enviado em vez de `iva_rate` (criar produto em Stock) | `src/hooks/useDatabase.ts` (DB_FIELD_MAP) | ✅ corrigido (commit `8ce84f5`) |
-| `targetLabel` enviado em vez de `target_label` (criar/editar metas) | `src/pages/Goals.tsx:60` | ✅ corrigido (commit `8ce84f5`) |
+| `targetLabel` enviado em vez de `target_label` (criar/editar metas) | `src/pages/Goals.tsx:60` | ✅ corrigido (commit `f0fdab9`) |
 | `customers.metadata` sem coluna no schema (criar cliente) | SQL `fix-campos-auditoria.sql` | ✅ coluna adicionada (a correr) |
 | Colunas de `products` em falta na DB (iva_rate, fracionavel, preco_dose, doses_por_garrafa, estimated_cost, daily_stock) | SQL `fix-products-campos-400.sql` | ✅ a correr (ida: já aplicado) |
 
