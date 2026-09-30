@@ -57,7 +57,7 @@ export default function Goals() {
       type: form.type as BusinessGoal['type'],
       category: form.category as BusinessGoal['category'],
       target,
-      targetLabel: form.targetLabel || undefined,
+      target_label: form.targetLabel || undefined,
       period: new Date().toISOString().slice(0, 10),
     };
 
