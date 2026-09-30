@@ -64,18 +64,19 @@ export default function Stock() {
   const safeSearch = sanitizeSearchQuery(search);
   
   const filteredProducts = products.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(safeSearch.toLowerCase());
+    const matchesSearch = (p.name || '').toLowerCase().includes(safeSearch.toLowerCase());
+    const stock = p.stock ?? 0;
     let matchesFilter = true;
     
-    if (filter === 'critical') matchesFilter = p.stock <= 5;
-    else if (filter === 'low') matchesFilter = p.stock > 5 && p.stock <= 15;
-    else if (filter === 'ok') matchesFilter = p.stock > 15;
+    if (filter === 'critical') matchesFilter = stock <= 5;
+    else if (filter === 'low') matchesFilter = stock > 5 && stock <= 15;
+    else if (filter === 'ok') matchesFilter = stock > 15;
     
     return matchesSearch && matchesFilter;
   });
 
-  const criticalCount = products.filter(p => p.stock <= 5).length;
-  const lowCount = products.filter(p => p.stock > 5 && p.stock <= 15).length;
+  const criticalCount = products.filter(p => (p.stock ?? 0) <= 5).length;
+  const lowCount = products.filter(p => (p.stock ?? 0) > 5 && (p.stock ?? 0) <= 15).length;
 
   const openAdjustDialog = (productId: string, type: 'entry' | 'exit' | 'adjust') => {
     setSelectedProductId(productId);
