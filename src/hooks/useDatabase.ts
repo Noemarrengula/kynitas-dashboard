@@ -22,6 +22,8 @@ function isNetworkError(msg?: string): boolean {
 const DB_FIELD_MAP: Record<string, string> = {
   cost_price: 'costPrice',
   costPrice: 'cost_price',
+  iva_rate: 'ivaRate',
+  ivaRate: 'iva_rate',
   cost_per_unit: 'costPerUnit',
   costPerUnit: 'cost_per_unit',
   min_stock: 'minStock',
