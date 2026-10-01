@@ -43,6 +43,7 @@ import { NewTableModal } from '@/components/tables/NewTableModal';
 import { useTablesPersistence } from '@/hooks/useTablesPersistence';
 import { useCredits } from '@/hooks/useCredits';
 import { printReceipt, printPreBill } from '@/lib/receipt';
+import { generateUUID } from '@/lib/uuid';
 
 const STATUS_META: Record<Table['status'], { label: string; dot: string; accent: string; badge: string }> = {
   free: {
@@ -146,17 +147,24 @@ export default function Tables() {
     toast({ title: 'Mesa atualizada!' });
   }, [managingTable, updateTable]);
 
-  const handleCreateTable = useCallback((data: { number: number; name?: string; customer_name?: string }) => {
+  const handleCreateTable = useCallback(async (data: { number: number; name?: string; customer_name?: string }) => {
     const newTable: Table = {
-      id: `table-${Date.now()}`,
+      id: generateUUID(),
       number: data.number,
       name: data.name,
       customer_name: data.customer_name,
       status: data.customer_name ? 'occupied' : 'free',
       opened_at: data.customer_name ? new Date() : undefined,
     };
-    addTable(newTable);
-    toast({ title: 'Mesa criada!' });
+    try {
+      await addTable(newTable);
+      toast({ title: 'Mesa criada!' });
+      return true;
+    } catch (error) {
+      console.error('Erro ao criar mesa:', error);
+      toast({ title: 'Erro ao criar mesa', description: getErrorMessage(error, 'Verifique a ligação e tente novamente'), variant: 'destructive' });
+      return false;
+    }
   }, [addTable]);
 
   const goToPos = useCallback((table: Table) => {

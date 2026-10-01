@@ -61,11 +61,12 @@ export function useTablesPersistence() {
     if (table.currentOrderId) dbData.current_order_id = table.currentOrderId;
 
     if (existing) {
-      await supabase
+      const { error } = await supabase
         .from('tables')
         .update({ ...dbData, updated_at: new Date().toISOString() })
         .eq('id', table.id)
         .eq('business_id', currentBusiness.id);
+      if (error) throw error;
     } else {
       const { error } = await supabase
         .from('tables')
@@ -77,6 +78,8 @@ export function useTablesPersistence() {
           .update({ ...dbData, updated_at: new Date().toISOString() })
           .eq('id', table.id)
           .eq('business_id', currentBusiness.id);
+      } else if (error) {
+        throw error;
       }
     }
   };
@@ -113,8 +116,7 @@ export function useTablesPersistence() {
     await syncTable(table);
   }, []);
 
-  const updateTable = useCallback(async (id: string, data: Partial<Table>) => {
-    const current = useStore.getState().tables.find(t => t.id === id);
+  const updateTable = useCallback(async (id: string, data: Partial<Table>) => {    const current = useStore.getState().tables.find(t => t.id === id);
     if (!current) return;
 
     const updated = { ...current, ...data };

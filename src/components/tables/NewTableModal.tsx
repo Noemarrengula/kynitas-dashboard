@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 interface NewTableModalProps {
   open: boolean;
   onClose: () => void;
-  onSave: (data: { number: number; name?: string; customer_name?: string }) => void;
+  onSave: (data: { number: number; name?: string; customer_name?: string }) => Promise<boolean>;
   existingNumbers: number[];
 }
 
@@ -16,25 +16,38 @@ const NewTableModal = memo(function NewTableModal({ open, onClose, onSave, exist
   const [number, setNumber] = useState(nextNumber);
   const [name, setName] = useState('');
   const [customerName, setCustomerName] = useState('');
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
+  const handleClose = () => {
+    if (saving) return;
+    onClose();
+  };
+
+  const handleSave = async () => {
+    if (saving) return;
     if (existingNumbers.includes(number)) {
       alert('Número de mesa já existe!');
       return;
     }
-    onSave({
-      number,
-      name: name.trim() || undefined,
-      customer_name: customerName.trim() || undefined,
-    });
-    setNumber(nextNumber + 1);
-    setName('');
-    setCustomerName('');
-    onClose();
+    setSaving(true);
+    try {
+      const ok = await onSave({
+        number,
+        name: name.trim() || undefined,
+        customer_name: customerName.trim() || undefined,
+      });
+      if (!ok) return;
+      setNumber(nextNumber + 1);
+      setName('');
+      setCustomerName('');
+      onClose();
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Nova Mesa</DialogTitle>
@@ -70,11 +83,11 @@ const NewTableModal = memo(function NewTableModal({ open, onClose, onSave, exist
           </div>
 
           <div className="flex gap-2 pt-4">
-            <Button variant="outline" onClick={onClose} className="flex-1">
+            <Button variant="outline" onClick={handleClose} className="flex-1" disabled={saving}>
               Cancelar
             </Button>
-            <Button onClick={handleSave} className="flex-1">
-              Criar Mesa
+            <Button onClick={handleSave} className="flex-1" disabled={saving}>
+              {saving ? 'A criar...' : 'Criar Mesa'}
             </Button>
           </div>
         </div>
