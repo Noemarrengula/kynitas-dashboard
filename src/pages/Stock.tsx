@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Package, AlertTriangle, Plus, Minus, History, Edit, DollarSign, Tag, ShoppingCart } from 'lucide-react';
+import { Package, AlertTriangle, Plus, Minus, History, Edit, DollarSign, Tag, ShoppingCart, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { sanitizeSearchQuery } from '@/lib/sanitize';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,16 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -34,6 +44,7 @@ import { ProductModal } from '@/components/products/ProductModal';
 import { ForecastSection, type ForecastEntry } from '@/components/stock/ForecastSection';
 import { PageHeader } from '@/components/ui/page-header';
 import { useDatabase } from '@/hooks/useDatabase';
+import { usePermissions } from '@/hooks/usePermissions';
 import { useI18n } from '@/contexts/I18nContext';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -43,8 +54,10 @@ import { exportStockStatusToPDF } from '@/lib/productReports';
 
 export default function Stock() {
   const navigate = useNavigate();
-  const { products, ingredients, updateProduct, loading, productForecast, recordStockMovement, stockMovements } = useDatabase();
+  const { products, ingredients, updateProduct, deleteProduct, loading, productForecast, recordStockMovement, stockMovements } = useDatabase();
+  const { isSuperAdmin, isSupervisor, can } = usePermissions();
   const { t } = useI18n();
+  const canDelete = isSuperAdmin || isSupervisor || can('products.delete');
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'critical' | 'low' | 'ok'>('all');
   const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
@@ -54,6 +67,7 @@ export default function Stock() {
   const [newProductType, setNewProductType] = useState<'drink' | 'meal' | 'cigarette'>('drink');
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
+  const [productToDelete, setProductToDelete] = useState<string | null>(null);
   const [adjustmentType, setAdjustmentType] = useState<'entry' | 'exit' | 'adjust'>('entry');
   const [adjustmentQuantity, setAdjustmentQuantity] = useState('');
   const [adjustmentReason, setAdjustmentReason] = useState('');
@@ -142,6 +156,23 @@ export default function Stock() {
     });
 
     setPriceDialogOpen(false);
+  };
+
+  const openProductDelete = (productId: string) => {
+    setProductToDelete(productId);
+  };
+
+  const confirmDelete = async () => {
+    if (!productToDelete) return;
+    const result = await deleteProduct(productToDelete);
+    setProductToDelete(null);
+    if (result?.error) {
+      toast({
+        title: 'Erro ao remover produto',
+        description: result.error.message || 'Tente novamente',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleTypeUpdate = async () => {
@@ -519,6 +550,18 @@ export default function Stock() {
                       >
                         <ShoppingCart className="h-4 w-4" />
                       </Button>
+                      {canDelete && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openProductDelete(product.id)}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          title="Eliminar produto"
+                          aria-label="Eliminar produto"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -765,6 +808,24 @@ export default function Stock() {
           type={newProductType as 'drink' | 'meal'}
         />
       )}
+
+      {/* Confirmar eliminação de produto */}
+      <AlertDialog open={Boolean(productToDelete)} onOpenChange={(open) => !open && setProductToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar produto?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. O produto "{products.find(p => p.id === productToDelete)?.name}" será removido permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
