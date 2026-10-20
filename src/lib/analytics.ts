@@ -144,7 +144,7 @@ export function topProducts(sales: Sale[], products: Product[]): TopProductPoint
   const totals: Record<string, { quantity: number; revenue: number }> = {};
 
   sales.forEach((sale) => {
-    sale.items.forEach((item) => {
+    (sale.items || []).forEach((item) => {
       const entry = totals[item.productId] || { quantity: 0, revenue: 0 };
       entry.quantity += item.quantity;
       entry.revenue += item.subtotal;

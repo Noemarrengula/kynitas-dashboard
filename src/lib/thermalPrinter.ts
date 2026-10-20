@@ -66,7 +66,7 @@ export function generateReceipt(sale: Sale, config: Partial<PrinterConfig> = {})
   lines.push(line('-', cfg.width));
   lines.push('');
   
-  sale.items.forEach(item => {
+  (sale.items || []).forEach(item => {
     const name = (item.product?.name ?? 'Produto').substring(0, cfg.width);
     lines.push(name);
     

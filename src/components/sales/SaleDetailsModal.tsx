@@ -120,9 +120,9 @@ const SaleDetailsModal = memo(function SaleDetailsModal({ sale, open, onClose }:
               <ShoppingBag className="h-4 w-4 text-muted-foreground" />
               <h3 className="font-semibold">Produtos</h3>
             </div>
-            {sale.items.length > 0 ? (
+            {(sale.items || []).length > 0 ? (
               <div className="space-y-2">
-                {sale.items.map((item, index) => (
+                {(sale.items || []).map((item, index) => (
                   <div key={index} className="flex justify-between items-center p-3 bg-muted rounded-lg">
                     <div className="flex items-center gap-3">
                       {item.product?.image && (

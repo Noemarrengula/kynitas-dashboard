@@ -261,7 +261,7 @@ export default function Tables() {
 
       // Check for low ingredients
       const lowIngredients: string[] = [];
-      selectedOrder.items.forEach(item => {
+      (selectedOrder.items || []).forEach(item => {
         const product = products.find(p => p.id === item.productId);
         if (product?.recipe) {
           product.recipe.forEach(recipeItem => {

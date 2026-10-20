@@ -92,8 +92,8 @@ export const useStore = create<AppState>((set) => ({
   
   // Orders
   orders: [],
-  setOrders: (orders) => set({ orders }),
-  addOrder: (order) => set((state) => ({ orders: [...state.orders, order] })),
+  setOrders: (orders) => set({ orders: orders.map((o) => ({ ...o, items: o.items || [] })) }),
+  addOrder: (order) => set((state) => ({ orders: [...state.orders, { ...order, items: order.items || [] }] })),
   updateOrder: (id, updatedOrder) => set((state) => ({
     orders: state.orders.map((o) => o.id === id ? { ...o, ...updatedOrder } : o),
   })),

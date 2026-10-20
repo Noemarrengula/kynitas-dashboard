@@ -42,7 +42,7 @@ export default function PurchaseDetail() {
   const receivedPerItem = useMemo(() => {
     const map: Record<string, number> = {};
     poReceipts.forEach((receipt) => {
-      receipt.items.forEach((it) => {
+      (receipt.items || []).forEach((it) => {
         const key = it.product_id || it.ingredient_id;
         if (!key) return;
         map[key] = (map[key] || 0) + (it.received_quantity ?? it.quantity ?? 0);

@@ -46,7 +46,7 @@ export function useDashboardAnalytics() {
     // Top 10 produtos mais vendidos
     const productSales = new Map<string, { name: string; quantity: number; revenue: number }>();
     sales.forEach(sale => {
-      sale.items.forEach(item => {
+      (sale.items || []).forEach(item => {
         if (!item.product) return; // Pular se produto não existe
         
         const existing = productSales.get(item.productId);

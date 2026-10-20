@@ -16,7 +16,7 @@ export const calculateTopProducts = (sales: Sale[]): TopProduct[] => {
   const productStats = new Map<string, TopProduct>();
 
   sales.forEach(sale => {
-    sale.items.forEach(item => {
+    (sale.items || []).forEach(item => {
       const productName = item.product?.name ?? 'Produto';
       const productPrice = item.product?.price ?? 0;
       const existing = productStats.get(productName) || {
@@ -230,7 +230,7 @@ export const exportStockEvolutionToPDF = (products: Product[], sales: Sale[], st
 
   const soldMap = new Map<string, number>();
   salesInPeriod.forEach(sale => {
-    sale.items.forEach(item => {
+    (sale.items || []).forEach(item => {
       const qty = item.product?.name?.includes('(Dose)') && item.product?.dosesPorGarrafa
         ? item.quantity / item.product.dosesPorGarrafa
         : item.quantity;

@@ -70,7 +70,7 @@ export const buildReceiptLines = (sale: SaleForPrint, copyType: 'client' | 'merc
   receipt.push('ITENS:');
   receipt.push('');
   
-  sale.items.forEach((item: any) => {
+  (sale.items || []).forEach((item: any) => {
     receipt.push(item.product?.name ?? 'Produto');
     receipt.push(formatLine(`  ${item.quantity}x ${formatCurrency(item.product?.price ?? 0)}`, formatCurrency(item.subtotal)));
   });
