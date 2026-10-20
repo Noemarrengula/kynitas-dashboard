@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Package, AlertTriangle, Plus, Minus, History, Edit, DollarSign, Tag, ShoppingCart, Trash2 } from 'lucide-react';
+import { Package, AlertTriangle, Plus, Minus, History, Edit, DollarSign, Tag, ShoppingCart, Trash2, ImagePlus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { sanitizeSearchQuery } from '@/lib/sanitize';
 import { Button } from '@/components/ui/button';
@@ -41,6 +41,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ProductModal } from '@/components/products/ProductModal';
+import { ProductPhotoDialog } from '@/components/stock/ProductPhotoDialog';
 import { ForecastSection, type ForecastEntry } from '@/components/stock/ForecastSection';
 import { PageHeader } from '@/components/ui/page-header';
 import { useDatabase } from '@/hooks/useDatabase';
@@ -51,6 +52,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { exportStockStatusToPDF } from '@/lib/productReports';
+import { Product } from '@/types';
 
 export default function Stock() {
   const navigate = useNavigate();
@@ -58,6 +60,7 @@ export default function Stock() {
   const { isSuperAdmin, isSupervisor, can } = usePermissions();
   const { t } = useI18n();
   const canDelete = isSuperAdmin || isSupervisor || can('products.delete');
+  const canEdit = can('produtos_editar');
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'critical' | 'low' | 'ok'>('all');
   const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
@@ -68,6 +71,7 @@ export default function Stock() {
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [productToDelete, setProductToDelete] = useState<string | null>(null);
+  const [photoProduct, setPhotoProduct] = useState<Product | null>(null);
   const [adjustmentType, setAdjustmentType] = useState<'entry' | 'exit' | 'adjust'>('entry');
   const [adjustmentQuantity, setAdjustmentQuantity] = useState('');
   const [adjustmentReason, setAdjustmentReason] = useState('');
@@ -550,6 +554,17 @@ export default function Stock() {
                       >
                         <ShoppingCart className="h-4 w-4" />
                       </Button>
+                      {canEdit && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setPhotoProduct(product)}
+                          title="Adicionar/editar foto"
+                          aria-label="Adicionar foto"
+                        >
+                          <ImagePlus className="h-4 w-4" />
+                        </Button>
+                      )}
                       {canDelete && (
                         <Button
                           variant="outline"
@@ -826,6 +841,13 @@ export default function Stock() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Foto do produto */}
+      <ProductPhotoDialog
+        open={Boolean(photoProduct)}
+        onClose={() => setPhotoProduct(null)}
+        product={photoProduct}
+      />
     </div>
   );
 }
